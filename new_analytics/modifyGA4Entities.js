@@ -453,7 +453,6 @@ function buildCreatePayload(sheetName, entity) {
     payload.parameterMutations = JSON.parse(entity[10] || '[]');
   } else if (sheetName == sheetsMeta.ga4.eventEditRules.sheetName) {
     payload.displayName = entity[6];
-    payload.sourceCopyParameters = entity[8];
     payload.eventConditions = JSON.parse(entity[9] || '[]');
     payload.parameterMutations = JSON.parse(entity[10] || '[]');
   } else if (sheetName == sheetsMeta.ga4.subpropertyEventFilters.sheetName) {
