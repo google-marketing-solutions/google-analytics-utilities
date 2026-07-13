@@ -84,7 +84,7 @@ function createAnalyticsMenu(mode) {
         .addSubMenu(
           ui.createMenu('BigQuery')
           .addItem('List', 'writeGA4BigQueryLinksToSheet')
-          .addItem('Modify', 'modifyBigQueryLinksToSheet'))
+          .addItem('Modify', 'modifyBigQueryLinks'))
         .addSubMenu(
           ui.createMenu('AdSense')
           .addItem('List', 'writeGA4AdSenseLinksToSheet')
