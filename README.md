@@ -36,6 +36,7 @@ The script currently performs the following functions:
 | [Rollup Property Source Links](#rollup-property-source-links)        | List, Create, Delete          |
 | [User Access Report](#user-access-report)                            | Create                        |
 | [Annotations](#annotations)                                          | List, Create, Delete, Update  |
+| [Custom Definitions Checker](#custom-definitions-checker)            | Create                        |
 
 
 These tasks can be completed by [joining the Google Group](https://groups.google.com/g/google-analytics-utilities-users), [copying the template spreadsheet](https://docs.google.com/spreadsheets/d/1kJqwYNed8RTuAgjy0aRUooD__MIPqzUeiDF5LZ7v1aI/), and clicking on various options under the Google Analytics Utilities menu.
@@ -1282,3 +1283,34 @@ Currently, the Google Anaytics Utilities can export audience list dimensions eit
 3. Check the "Delete" box for the Annotations you want to delete.
 4. Click Google Analytics Utilities > Annotations > Modify.
 5. The script will attempt to delete the Annotations.
+
+### Custom Definitions Checker
+
+The Custom Definitions Checker lists the custom dimensions and custom metrics of the selected properties together with the number of events that collected each of them in the last 30 days (ending yesterday). Use it to find custom definitions that are registered but are not collected at all.
+
+#### Create
+
+1. List GA4 account summaries.
+2. Select the properties you want to check.
+3. Navigate to the "Custom Dimensions Checker" (or "Custom Metrics Checker") sheet.
+4. Click Google Analytics Utilities > Advanced > Custom Definitions Checker > Check Custom Dimensions (or Check Custom Metrics).
+5. The custom dimensions (or custom metrics) of the selected properties will be listed in the sheet. Please note that the information in the sheet will be cleared whenever the report is run again.
+
+How the "Event Count (Last 30 Days)" column is calculated:
+
+- Event-scoped custom dimensions: the number of events where the custom dimension had a value other than "(not set)".
+- User-scoped custom dimensions: the number of events of users who had the user property set.
+- Item-scoped custom dimensions: GA4 doesn't allow item-scoped dimensions to be combined with the event count, so this is the number of item units where the custom dimension had a value in the view_item_list, select_item, view_promotion, select_promotion, view_item, add_to_cart, begin_checkout and purchase events. The "Top Events (Event Count)" column shows the item units per event. Item-scoped custom dimensions that are only sent with other events (for example add_to_wishlist or remove_from_cart) are not counted.
+- Custom metrics: the number of events of the event names that recorded a non-zero value for the custom metric. GA4 doesn't report whether a metric was sent with each individual event, so this is an upper bound. The "Total Value (Last 30 Days)" column contains the sum of the custom metric.
+
+The "Status" column is one of:
+
+- "Collected" or "Not collected".
+- "None defined" if the property has no custom dimensions (or custom metrics).
+- "Error" if the definition couldn't be checked. The reason is written to the "Notes" column.
+- "Not checked" if the report stopped early to stay within the Apps Script time limit. Select fewer properties and run the report again.
+
+Please note:
+
+- GA4 only collects data for a custom definition after it has been created, so definitions created in the last 30 days will have lower counts.
+- The checker sends one [GA4 Data API](https://developers.google.com/analytics/devguides/reporting/data/v1/quotas) request per custom definition, which counts towards the property's Data API quota.

@@ -76,6 +76,36 @@ const sheetsMeta = {
         numColumns: 15
       }
     },
+    customDimensionsChecker: {
+      sheetName: 'Custom Dimensions Checker',
+      write: {
+        row: 2,
+        column: 1,
+        numRows: 1,
+        numColumns: 11
+      },
+      read: {
+        row: 2,
+        column: 1,
+        numRows: 1,
+        numColumns: 11
+      }
+    },
+    customMetricsChecker: {
+      sheetName: 'Custom Metrics Checker',
+      write: {
+        row: 2,
+        column: 1,
+        numRows: 1,
+        numColumns: 13
+      },
+      read: {
+        row: 2,
+        column: 1,
+        numRows: 1,
+        numColumns: 13
+      }
+    },
     keyEvents: {
       sheetName: 'Key Events',
       write: {

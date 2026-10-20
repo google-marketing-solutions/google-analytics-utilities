@@ -469,6 +469,16 @@
           <button class="action-btn" onclick="runFunc('writeGA4KeyEventsToSheet', 'Key Events')">List</button>
           <button class="action-btn" onclick="runFunc('modifyGA4KeyEvents', 'Key Events')">Modify</button>
         </div>
+        <div class="group-title">Custom Dimensions Checker <span class="jump-link" role="button" tabindex="0"
+            aria-label="Open the Custom Dimensions Checker sheet" onclick="jumpToTab('Custom Dimensions Checker')"
+            onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"
+            title="Go to sheet">↗ Open</span></div>
+        <button class="action-btn" onclick="runFunc('writeGA4CustomDimensionsCheckerToSheet', 'Custom Dimensions Checker')">Run Report</button>
+        <div class="group-title">Custom Metrics Checker <span class="jump-link" role="button" tabindex="0"
+            aria-label="Open the Custom Metrics Checker sheet" onclick="jumpToTab('Custom Metrics Checker')"
+            onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"
+            title="Go to sheet">↗ Open</span></div>
+        <button class="action-btn" onclick="runFunc('writeGA4CustomMetricsCheckerToSheet', 'Custom Metrics Checker')">Run Report</button>
       </div>
     </details>
       
@@ -728,6 +738,8 @@
           "Custom Metrics": "List or modify custom metrics. To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Update'/'Remove'). 3. Click 'Modify'.",
           "Calculated Metrics": "List or modify calculated metrics. To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Update'/'Remove'). 3. Click 'Modify'.",
           "Key Events": "List or modify key events (conversions). To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Remove'). 3. Click 'Modify'.",
+          "Custom Dimensions Checker": "Lists the custom dimensions of the selected properties with the number of events that collected each of them in the last 30 days, so you can find custom dimensions that are not collected. Select properties in 'Account Summaries' first.",
+          "Custom Metrics Checker": "Lists the custom metrics of the selected properties with their total value and the number of events that recorded them in the last 30 days, so you can find custom metrics that are not collected. Select properties in 'Account Summaries' first.",
           "Audience Definitions": "List or modify GA4 audience definitions. To modify: 1. Run 'List'. 2. Edit sheet. 3. Check 'Create'/'Remove'. 4. Click 'Modify'.",
           "Audience User Exports": "Process: 1. List audiences to get IDs. 2. Select audiences in sheet. 3. Click 'Create Audience Lists'. 4. Click 'Check States' until ready. 5. Click 'Export Data' to download.",
           "Users": "List or modify user access permissions. To modify: 1. Run 'List'. 2. Edit roles. 3. Check 'Create'/'Update'/'Remove'. 4. Click 'Modify'.",

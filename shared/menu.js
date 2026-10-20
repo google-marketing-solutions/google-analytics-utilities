@@ -135,6 +135,10 @@ function createAnalyticsMenu(mode) {
             ui.createMenu('Health Report')
             .addItem('Create Report', 'createHealthReport'))
           .addSubMenu(
+            ui.createMenu('Custom Definitions Checker')
+            .addItem('Check Custom Dimensions', 'writeGA4CustomDimensionsCheckerToSheet')
+            .addItem('Check Custom Metrics', 'writeGA4CustomMetricsCheckerToSheet'))
+          .addSubMenu(
             ui.createMenu('Audience Lists')
             .addItem('List Existing Audiences', 'writeGA4AudiencesToAudiencesListsSheet')
             .addItem('List Audience Lists', 'writeAudienceListsToSheet')
@@ -161,7 +165,7 @@ function createAnalyticsMenu(mode) {
 function showSidebar() {
   try {
     const html = HtmlService.createHtmlOutputFromFile('sidebar')
-        .setTitle('GA Utilities Navigation')
+      .setTitle('GA Utilities Navigation')
         .setWidth(300);
     SpreadsheetApp.getUi().showSidebar(html);
   } catch (err) {
