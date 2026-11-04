@@ -819,7 +819,20 @@ If you archive, delete, create, or update a GA4 setting, then a corresponding ac
 5. The script will attempt to update the selected access bindings. Batching is not used.
 
 
-### GA4 Settings Report
+### Settings Report
+
+The Settings Report creates a Google Slides presentation that summarizes the GA4 settings of the properties in the "Property Details" sheet. The default template contains the following sections:
+
+- **Property Details:** The number of properties, Google Signals, Google Analytics 360, and the properties that received data in the last 7 days.
+- **Data Settings:** 14-month event data retention, enhanced measurement, user-provided data collection, and data-driven attribution.
+- **Audiences**, **Key Events**, and **Data Streams**.
+- **Custom Dimensions** and **Custom Metrics**, including the share that collected data in the last 30 days.
+- **Unused Custom Definitions:** The custom dimensions and custom metrics that collected no data in the last 30 days, based on the [Custom Definitions Checker](#custom-definitions-checker).
+- **Links:** Google Ads, DV360, Firebase, and BigQuery.
+- **Snapshot:** One slide per property with its main settings.
+- **Recommended Next Steps:** The most important actions, based on the lowlights of all sections.
+
+Every section has highlights and lowlights. All values of the default template are calculated by the script from the GA Utilities sheets, so no formulas are needed in the "Report Settings" sheet.
 
 
 #### Create a Report
@@ -829,33 +842,41 @@ If you archive, delete, create, or update a GA4 setting, then a corresponding ac
 1. List GA4 account summaries.
 2. Select the properties for which you want to generate a report.
 3. Navigate to the "Report Settings" sheet.
-4. Enter the information as indicated for rows 4-9.
-    1. If the "Template Slides URL" value is left as "Default" or is blank, then the default template will be used. Otherwise, a Google Slides URL of a template presentation must be provided.
-    2. If the box for "Request New Settings Information" is checked, then GA Utilities will automatically list new information for several different GA4 sheets. This newly listed information will clear any existing settings listed in the sheets. This includes the following sheets: 
-        1. GA4 Property Details
-        2. GA4 Audiences
-        3. GA4 Data Streams
-        4. GA4 Key Events
-        5. GA4 Custom Dimensions
-        6. GA4 Custom Metrics
-        7. GA4 Google Ads Links
-        8. GA4 DV360 Links
-        9. GA4 Firebase Links
-5. The placeholder rows starting at row 10 can be added to, removed, or changed as you prefer. Each column works in the following way:
-    1. **Placeholder Text:** This is the placeholder text found in the template spreadsheet. Each placeholder text can only be used once per slide. A placeholder can be whatever you want, but the behavior of the script will change if any of the following words are used:
-        1. **percent**: If the word "percent" (all in lowercase) is used in the placeholder, then the value in the slide will be properly formatted as a percent and will change color depending on the information entered for the percent range color scale. The value in the spreadsheet must be a number.
-        2. **image, graphic, or logo**: If the image, graphic, or logo (all lowercase) are used in the placeholder, then the value must be a URL that points to an image. The script will then try to swap out the placeholder in the template with the image from the URL.
-        3. **list**: If the word "list" is used in the placeholder, then the script will try to create a bulleted list in the slide based on the value in the spreadsheet. The value in the spreadsheet will be split by the presence of double semicolons (;;). For example, the following would be split into two bullet points: <code><em>hello, world;;example list</em></code>. You can either construct a list value in a single line, or you can have multiple rows with the exact same placeholder name and the script will create a list for you from those rows. 
-    2. <strong>Template Slide</strong>: The template slide column is used to determine which slide a given placeholder text belongs to. The template slide text must exist in the speaker notes section for a given slide in order for the script to identify the correct slide.
+4. Enter the settings at the top of the sheet. Each setting is found by its label in column A and its value is read from column C, so the rows can be moved.
+    1. **Report Name:** The name of the presentation. If it's blank, "GA4 Settings Report" is used.
+    2. **Template Presentation URL:** If the value is "Default" or blank, the default template is used. Otherwise, enter the URL of a Google Slides template presentation that you have access to.
+    3. **Who to share this report with:** Optional. The email addresses, separated by commas.
+    4. **Sharing Access Level:** View, Comment, or Edit.
+    5. **Percent Range Colors:** The colors of the percentages on the slides, for example <code>0-30,#FF0000;31-70,#FFA500;71-100,#34a853</code>. Percentages that describe the setup rather than its quality (360 properties, iOS and Android data streams, DV360 and Firebase links, and user-provided data collection) aren't colored.
+
+    Older copies of this sheet also have "Request New Settings Information" and "Check Custom Definitions" rows. They're no longer used and can be deleted, because you now choose which sheets to update when you create the report.
+5. The placeholder rows below the "Placeholder Text" header can be added to, removed, or changed as you prefer. The placeholders of the default template, for example <code>--num_props--</code>, <code>--retention_percent--</code>, <code>--cds_highlights_list--</code>, or <code>--unused_cds_list--</code>, are calculated by the script. To replace a calculated value, for example to reword a highlight, add a row for its placeholder, check Include, and enter your own value. If Include is unchecked or the value is empty, the calculated value is used. When the report is created, the placeholders that show your values instead of the calculated ones are listed for review. Copies of this sheet from earlier versions have checked rows with formulas for these placeholders, so uncheck those rows to use the calculated values. Also use the rows for your own placeholders, such as <code>--company_name--</code>, <code>--customer_logo--</code>, and <code>--your_logo--</code> on the title slide. Each column works in the following way:
+    1. **Placeholder Text:** This is the placeholder text found in the template presentation. A placeholder can be whatever you want, but the behavior of the script will change if any of the following words are used:
+        1. **percent**: If the word "percent" is used in the placeholder, then the value in the slide will be formatted as a percent and will change color depending on the percent range colors. The value in the spreadsheet must be a number between 0 and 1, for example 0.75 for 75%.
+        2. **image, graphic, or logo**: If image, graphic, or logo is used in the placeholder, then the value must be a URL that points to an image. The script replaces the shape that contains the placeholder with the image, so the placeholder must be the only text in its shape. If the value is empty, the shape is removed.
+        3. **list**: If the word "list" is used in the placeholder, then the script creates a bulleted list in the slide based on the value in the spreadsheet. The value in the spreadsheet will be split by the presence of double semicolons (;;). For example, the following would be split into two bullet points: <code><em>hello, world;;example list</em></code>. You can either construct a list value in a single cell, or you can have multiple rows with the exact same placeholder name and the script will create a list for you from those rows.
+    2. <strong>Template Slide</strong>: Optional. Use it to give a placeholder a different value on different slides. A slide uses the rows whose template slide text is in its speaker notes, for example <code>--cds_template--</code>. Other slides use the rows of the placeholder without a template slide or, if there are none, the first rows of the placeholder.
     3. <strong>Include</strong>: Either check the box or use a formula to determine if a placeholder should be considered when building the final presentation.
     4. <strong>Value</strong>: The final value that will appear on the slide where the placeholder text is present.
-6. If your template includes one or more slides that need to be duplicated, then you must navigate to the "Report Settings - Snapshot" sheet and enter settings for those slides. This sheet can be customized in the following way:
-    1. Column A: Contains the property ID for a given GA4 property and is included to make it easier to create formulas in other columns.
-    2. Column B: Contains the template slide placeholder and is used to identify the template slide.
-    3. Columns C+: The headers for these columns should contain the placeholder text that will be swapped with a real value when the report is complete.  Every row after the header should have a value for that specific property. These values can be derived from the other GA Utilities sheets or entered as plain text. The placeholder name rules are the same as previously stated: percent formats the number value as a percent on the slide, list creates a bulleted list, image/graphic/logo uses a provided URL as an image, and any other name just replaces the value on the slide as is.
-7. Once all values have been entered, click GA Utilities > Advanced > Health Report > Create Report
-8. Once the health report has been created, a link to the report and the date of its creation will be appended to columns F and G in the "Report Settings" sheet. The date of creation will default to MM-DD-YYYY format, but that can be reformatted if you so wish.
-9. Review the new report and make any necessary adjustments. There may be some placeholders that aren’t removed if said placeholder was not included in the sheet but was present in the template. This is expected and you should delete the placeholder manually. You may also need to adjust image sizes, which is expected.
+6. The slide with <code>--snapshot_template--</code> in its speaker notes is copied once for every property, in the order of the "Property Details" sheet. Its values are calculated by the script and can't be replaced. To add your own placeholders to these slides, use the "Report Settings - Snapshot" sheet:
+    1. Column A: Contains the property ID of a GA4 property.
+    2. Column B: Contains the template slide text. If it's blank, <code>--snapshot_template--</code> is used. If you enter the speaker notes text of another slide, that slide is copied once for every row with this text.
+    3. Columns C+: The headers for these columns should contain the placeholder text that will be swapped with a real value when the report is complete. Every row after the header should have a value for that specific property. These values can be derived from the other GA Utilities sheets or entered as plain text. The placeholder name rules are the same as previously stated: percent formats the number value as a percent on the slide, list creates a bulleted list, image/graphic/logo uses a provided URL as an image, and any other name just replaces the value on the slide as is.
+7. Click **Create Report** under Settings Report in the sidebar, or Google Analytics Utilities > Advanced > Settings Report > Create Report. Before the report is created, a confirmation lists the sheets that the report uses. When you proceed, these sheets are updated for the properties selected in the "Account Summaries" sheet, and then the report is created:
+    1. **Property Details:** properties, Google Signals, data retention and attribution. This sheet defines the properties of the report.
+    2. **Audiences**, **Key Events**, **Data Streams**, **Custom Dimensions**, and **Custom Metrics**.
+    3. **Google Ads Links**, **DV360 Links**, **Firebase Links**, and **BigQuery Links**.
+    4. **Custom Dimensions Checker** and **Custom Metrics Checker:** the custom dimensions and custom metrics without data in the last 30 days. See the [Custom Definitions Checker](#custom-definitions-checker).
+
+    In the sidebar, you can uncheck a sheet to use the information that is already in it, for example when you only changed the "Report Settings" sheet. The sidebar updates one sheet at a time and shows the progress in its status bar, so keep it open until the report is created. From the menu, all sheets are updated.
+8. Once the report has been created, the sidebar's status bar shows a link to the report and anything you should review, for example sheets that couldn't be updated or placeholders that are still in the presentation because they have no value. From the menu, anything to review is shown in an alert. A link to the report and the date of its creation will also be appended to columns F and G in the "Report Settings" sheet. The date of creation will default to MM-DD-YYYY format, but that can be reformatted if you so wish.
+9. Review the new report and make any necessary adjustments. You may need to adjust image sizes, which is expected.
+
+Please note:
+
+- Data streams are only counted for ordinary properties, because subproperties and roll-up properties don't have data streams.
+- Apps Script stops a run after 6 minutes. The sidebar updates each sheet in a separate run. From the menu, everything runs at once: sheets aren't updated after 3 minutes, the custom definitions checks stop after 4 minutes, and the snapshot slides aren't copied after 5.5 minutes. The information that is already in the sheets is used instead, and the sheets that were skipped are listed for review. For many properties, use the sidebar.
+- The text boxes of the template don't shrink their text, so long lists are shortened: up to 3 highlights and 3 lowlights per section, up to 6 next steps, and up to 10 unused custom definitions per list. All unused custom definitions are listed in the checker sheets. Lists that you enter in the "Report Settings" sheet aren't shortened.
 
 
 ### Easy Property Creation

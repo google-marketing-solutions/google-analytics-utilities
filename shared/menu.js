@@ -132,7 +132,7 @@ function createAnalyticsMenu(mode) {
             .addItem(
               'Resize Row Heights', 'resizeEasyPropertyCreationSheetRowHeights'))
           .addSubMenu(
-            ui.createMenu('Health Report')
+            ui.createMenu('Settings Report')
             .addItem('Create Report', 'createHealthReport'))
           .addSubMenu(
             ui.createMenu('Custom Definitions Checker')

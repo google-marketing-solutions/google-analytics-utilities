@@ -94,13 +94,7 @@ const CHECKER_NOTES = {
  * collected each of them in the last 30 days.
  */
 function writeGA4CustomDimensionsCheckerToSheet() {
-  runCustomDefinitionsChecker_({
-    resourceKey: 'customDimensions',
-    sheetMeta: sheetsMeta.ga4.customDimensionsChecker,
-    buildRequest: buildCustomDimensionCheckRequest_,
-    summarizeReport: summarizeCustomDimensionReport_,
-    buildRow: buildCustomDimensionCheckRow_
-  });
+  runCustomDefinitionsChecker_(getCustomDimensionsChecker_());
 }
 
 /**
@@ -109,13 +103,35 @@ function writeGA4CustomDimensionsCheckerToSheet() {
  * number of events that recorded them in the last 30 days.
  */
 function writeGA4CustomMetricsCheckerToSheet() {
-  runCustomDefinitionsChecker_({
+  runCustomDefinitionsChecker_(getCustomMetricsChecker_());
+}
+
+/**
+ * Returns the settings of the custom dimensions checker.
+ * @return {!Object}
+ */
+function getCustomDimensionsChecker_() {
+  return {
+    resourceKey: 'customDimensions',
+    sheetMeta: sheetsMeta.ga4.customDimensionsChecker,
+    buildRequest: buildCustomDimensionCheckRequest_,
+    summarizeReport: summarizeCustomDimensionReport_,
+    buildRow: buildCustomDimensionCheckRow_
+  };
+}
+
+/**
+ * Returns the settings of the custom metrics checker.
+ * @return {!Object}
+ */
+function getCustomMetricsChecker_() {
+  return {
     resourceKey: 'customMetrics',
     sheetMeta: sheetsMeta.ga4.customMetricsChecker,
     buildRequest: buildCustomMetricCheckRequest_,
     summarizeReport: summarizeCustomMetricReport_,
     buildRow: buildCustomMetricCheckRow_
-  });
+  };
 }
 
 /**
@@ -123,16 +139,22 @@ function writeGA4CustomMetricsCheckerToSheet() {
  * results to the checker's sheet.
  * @param {!Object} checker The settings of the custom dimensions or the
  *     custom metrics checker.
+ * @param {{deadline: (number|undefined), silent: (boolean|undefined)}=}
+ *     options The time after which no Data API requests are started
+ *     (defaults to CHECKER_TIME_BUDGET_MS from now), and whether to skip the
+ *     alert when no property is selected. Used by the Settings Report.
  */
-function runCustomDefinitionsChecker_(checker) {
+function runCustomDefinitionsChecker_(checker, options = {}) {
   // Accounts without properties are listed with an empty property ID.
   const properties = getSelectedGa4Properties().filter(row => row[3]);
   if (properties.length === 0) {
-    SpreadsheetApp.getUi().alert(
-      'Please select at least one property in the "Account Summaries" sheet.');
+    if (!options.silent) {
+      SpreadsheetApp.getUi().alert(
+        'Please select at least one property in the "Account Summaries" sheet.');
+    }
     return;
   }
-  const deadline = Date.now() + CHECKER_TIME_BUDGET_MS;
+  const deadline = options.deadline || Date.now() + CHECKER_TIME_BUDGET_MS;
   const rows = [];
 
   properties.forEach(property => {
