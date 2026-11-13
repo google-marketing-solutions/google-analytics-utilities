@@ -404,6 +404,38 @@ function modifyGA4Entities(sheetName) {
 }
 
 /**
+ * Splits a comma separated sheet cell into an array of trimmed values.
+ * Cells holding a boolean or a number are coerced first, and an empty
+ * cell yields an empty array rather than [''].
+ * @param {?} cellValue The raw value read from the sheet.
+ * @return {!Array<string>} The individual values in the cell.
+ */
+function splitListCell(cellValue) {
+  if (cellValue === '' || cellValue === null || cellValue === undefined) {
+    return [];
+  }
+  return cellValue.toString()
+    .split(',')
+    .map(value => value.trim())
+    .filter(value => value !== '');
+}
+
+/**
+ * Coerces a sheet cell into a real boolean. The Admin API omits false
+ * booleans from its JSON responses, so those cells are written to the
+ * sheet blank and read back as an empty string, which the API then
+ * rejects for a TYPE_BOOL field. An empty cell means false.
+ * @param {?} cellValue The raw value read from the sheet.
+ * @return {boolean} The boolean the cell represents.
+ */
+function toBooleanCell(cellValue) {
+  if (typeof cellValue === 'boolean') {
+    return cellValue;
+  }
+  return cellValue.toString().trim().toLowerCase() === 'true';
+}
+
+/**
  * Builds the payload sent to the API to create an entity.
  * @param {string} sheetName The name of the sheet from which
  * the data will be retrieved.
@@ -552,13 +584,13 @@ function buildCreatePayload(sheetName, entity) {
     payload.sourceProperty = entity[4];
   } else if (sheetName == sheetsMeta.ga4.bigqueryLinks.sheetName) {
     payload.project = entity[4];
-    payload.dailyExportEnabled = entity[7];
-    payload.excludedEvents = entity[8].split(',');
-    payload.exportStreams = entity[9].split(',');
-    payload.includeAdvertisingId = entity[10];
-    payload.streamingExportEnabled = entity[11];
-    payload.freshDailyExportEnabled = entity[12];
-    payload.datasetLocation = entity[13];
+    payload.includeAdvertisingId = toBooleanCell(entity[6]);
+    payload.dailyExportEnabled = toBooleanCell(entity[7]);
+    payload.streamingExportEnabled = toBooleanCell(entity[8]);
+    payload.freshDailyExportEnabled = toBooleanCell(entity[9]);
+    payload.excludedEvents = splitListCell(entity[10]);
+    payload.exportStreams = splitListCell(entity[11]);
+    payload.datasetLocation = entity[12];
   } else if (sheetName == sheetsMeta.ga4.calculatedMetrics.sheetName) {
     payload.displayName = entityDisplayNameOrId;
     payload.description = entity[6];
@@ -710,12 +742,12 @@ function buildUpdatePayload(sheetName, entity) {
   } else if (sheetName == sheetsMeta.ga4.subpropertyEventFilters.sheetName) {
     payload.filterClauses = JSON.parse(entity[6]);
   } else if (sheetName == sheetsMeta.ga4.bigqueryLinks.sheetName) {
-    payload.dailyExportEnabled = entity[7];
-    payload.excludedEvents = entity[8].split(',');
-    payload.exportStreams = entity[9].split(',');
-    payload.includeAdvertisingId = entity[10];
-    payload.streamingExportEnabled = entity[11];
-    payload.freshDailyExportEnabled = entity[12];
+    payload.includeAdvertisingId = toBooleanCell(entity[6]);
+    payload.dailyExportEnabled = toBooleanCell(entity[7]);
+    payload.streamingExportEnabled = toBooleanCell(entity[8]);
+    payload.freshDailyExportEnabled = toBooleanCell(entity[9]);
+    payload.excludedEvents = splitListCell(entity[10]);
+    payload.exportStreams = splitListCell(entity[11]);
   } else if (sheetName == sheetsMeta.ga4.calculatedMetrics.sheetName) {
     payload.displayName = entityDisplayNameOrId;
     payload.description = entity[6];
