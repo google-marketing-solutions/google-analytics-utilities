@@ -172,5 +172,6 @@ function writeUserAccessReportDataToSheet() {
   const data = [headers, ...records];
   const sheet = ss.getSheetByName(sheetsMeta.ga4.userAccessReport.sheetName);
   sheet.clearContents();
-  sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+  sheet.getRange(1, 1, data.length, data[0].length)
+    .setValues(neutralizeFormulas(data));
 }
