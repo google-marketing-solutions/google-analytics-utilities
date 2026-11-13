@@ -27,6 +27,38 @@ const apiActionTaken = {
 };
 
 /**
+ * Characters that make Google Sheets interpret a cell value as a formula.
+ * @const {!RegExp}
+ */
+const FORMULA_TRIGGER_REGEX = /^[=+\-@\t\r]/;
+
+/**
+ * Neutralizes a single cell value so that Google Sheets always stores it as
+ * literal text rather than evaluating it as a formula (CWE-1236).
+ * Strings starting with a formula trigger character are prefixed with a
+ * single quote, which Sheets hides in the cell and strips from getValues().
+ * Non-string values (numbers, booleans, dates) are returned unchanged.
+ * @param {*} value The cell value to neutralize.
+ * @return {*} The neutralized cell value.
+ */
+function neutralizeFormula(value) {
+  if (typeof value === 'string' && FORMULA_TRIGGER_REGEX.test(value)) {
+    return "'" + value;
+  }
+  return value;
+}
+
+/**
+ * Neutralizes every cell in a two-dimensional array of cell values before it
+ * is written to a sheet with Range.setValues().
+ * @param {!Array<!Array<*>>} data The rows of cell values.
+ * @return {!Array<!Array<*>>} A new array with every cell neutralized.
+ */
+function neutralizeFormulas(data) {
+  return data.map(row => row.map(neutralizeFormula));
+}
+
+/**
  * Gets the creation date of the active spreadsheet.
  * @return {string} The creation date formatted.
  */
@@ -185,7 +217,7 @@ function writeToSheet(data, sheetName) {
       sheet.insertColumnsAfter(maxCols, requiredCols - maxCols);
     }
     sheet.getRange(ranges.row, ranges.column, data.length, ranges.numColumns)
-         .setValues(data);
+         .setValues(neutralizeFormulas(data));
   }
   if (getAutoJump()) {
     sheet.activate();
@@ -243,7 +275,7 @@ function writeActionTakenToSheet(sheetName, index, actionTaken) {
   }
 	sheet.getRange(
 		writeRow, actionTakenColumn, 1, 1
-	).setValue(actionTaken);
+	).setValue(neutralizeFormula(actionTaken));
 }
 
 /**

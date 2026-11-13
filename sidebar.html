@@ -76,6 +76,59 @@
         color: var(--error-color);
         border-color: #fad2cf;
       }
+      .warning {
+        background-color: #fef7e0;
+        color: #8a4b00;
+        border-color: #feefc3;
+      }
+      /* Results with a link or notes stay until they are dismissed. */
+      #status.has-details {
+        position: relative;
+        padding-right: 28px;
+        text-align: left;
+      }
+      #status a {
+        color: inherit;
+        font-weight: 600;
+        text-decoration: underline;
+      }
+      #status p {
+        margin: 6px 0 0;
+      }
+      #status ul {
+        margin: 4px 0 0;
+        padding-left: 16px;
+        max-height: 160px;
+        overflow-y: auto;
+        font-weight: 400;
+      }
+      #status li + li {
+        margin-top: 4px;
+      }
+      .status-close {
+        position: absolute;
+        top: 3px;
+        right: 4px;
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        font-size: 14px;
+        line-height: 20px;
+        cursor: pointer;
+      }
+      .status-close:hover {
+        background-color: rgba(60, 64, 67, 0.08);
+      }
+      .status-close:focus-visible,
+      .modal-btn:focus-visible,
+      .report-step input:focus-visible {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+      }
       
       .search-container {
         padding: 4px 0 0 0;
@@ -330,6 +383,8 @@
         box-shadow: var(--shadow);
         width: 85%;
         max-width: 280px;
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
         box-sizing: border-box;
       }
       .modal-content h4 {
@@ -373,12 +428,57 @@
       .secondary-btn:hover {
         background-color: #eee;
       }
+
+      /* Sheets that the Settings Report updates before it creates the report */
+      .report-steps {
+        list-style: none;
+        margin: 0 0 10px;
+        padding: 0;
+        max-height: 45vh;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+      }
+      .report-step + .report-step {
+        border-top: 1px solid #f1f3f4;
+      }
+      .report-step label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-primary);
+      }
+      .report-step input {
+        margin: 2px 0 0;
+        flex-shrink: 0;
+      }
+      .report-step-name {
+        display: block;
+        font-weight: 600;
+      }
+      .report-step-provides {
+        display: block;
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+      .modal-content .modal-note {
+        margin-bottom: 12px;
+        font-size: 11px;
+      }
+      .action-btn:disabled {
+        color: var(--text-secondary);
+        cursor: default;
+        background: none;
+      }
     </style>
   </head>
   <body>
     <div class="sticky-header">
       <!-- Default state uses standard non-breaking space to hold dimensions if empty -->
-      <div id="status">&nbsp;</div>
+      <div id="status" role="status" aria-live="polite">&nbsp;</div>
 
       <div class="search-container">
         <input type="text" id="search-input" placeholder="Search tools..." oninput="filterTools(this.value)">
@@ -469,6 +569,16 @@
           <button class="action-btn" onclick="runFunc('writeGA4KeyEventsToSheet', 'Key Events')">List</button>
           <button class="action-btn" onclick="runFunc('modifyGA4KeyEvents', 'Key Events')">Modify</button>
         </div>
+        <div class="group-title">Custom Dimensions Checker <span class="jump-link" role="button" tabindex="0"
+            aria-label="Open the Custom Dimensions Checker sheet" onclick="jumpToTab('Custom Dimensions Checker')"
+            onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"
+            title="Go to sheet">↗ Open</span></div>
+        <button class="action-btn" onclick="runFunc('writeGA4CustomDimensionsCheckerToSheet', 'Custom Dimensions Checker')">Run Report</button>
+        <div class="group-title">Custom Metrics Checker <span class="jump-link" role="button" tabindex="0"
+            aria-label="Open the Custom Metrics Checker sheet" onclick="jumpToTab('Custom Metrics Checker')"
+            onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"
+            title="Go to sheet">↗ Open</span></div>
+        <button class="action-btn" onclick="runFunc('writeGA4CustomMetricsCheckerToSheet', 'Custom Metrics Checker')">Run Report</button>
       </div>
     </details>
       
@@ -585,9 +695,9 @@
         <button class="action-btn" onclick="runFunc('createPropertiesFromTemplates', 'Easy Property Creation')">Create Properties</button>
         <button class="action-btn" onclick="runFunc('resizeEasyPropertyCreationSheetRowHeights', 'Easy Property Creation')">Resize Row Heights</button>
         
-        <div class="group-title">Health Report <span class="jump-link" onclick="jumpToTab('Report Settings')"
+        <div class="group-title">Settings Report <span class="jump-link" onclick="jumpToTab('Report Settings')"
             title="Go to sheet">↗ Open</span></div>
-        <button class="action-btn" onclick="runFunc('createHealthReport', 'Report Settings')">Create Report</button>
+        <button class="action-btn" id="create-report-btn" onclick="confirmSettingsReport()">Create Report</button>
 
         <div class="group-title">Account Change History <span class="jump-link" onclick="jumpToTab('Account Change History')"
             title="Go to sheet">↗ Open</span></div>
@@ -617,12 +727,14 @@
     </details>
 
     <div id="confirm-modal" class="modal">
-      <div class="modal-content">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title"
+          aria-describedby="modal-message">
         <h4 id="modal-title">Confirm Action</h4>
         <p id="modal-message">Are you sure you want to proceed?</p>
+        <div id="modal-details"></div>
         <div class="modal-buttons">
-          <button id="modal-cancel-btn" class="modal-btn secondary-btn">Cancel</button>
-          <button id="modal-confirm-btn" class="modal-btn primary-btn">Proceed</button>
+          <button type="button" id="modal-cancel-btn" class="modal-btn secondary-btn">Cancel</button>
+          <button type="button" id="modal-confirm-btn" class="modal-btn primary-btn">Proceed</button>
         </div>
       </div>
     </div>
@@ -632,10 +744,22 @@
     </div>
 
     <script>
-      function showConfirmModal(title, message, onConfirm) {
+      /** The element that had the focus before the modal was opened. */
+      let modalReturnFocus = null;
+
+      /**
+       * Asks for confirmation. The optional details, for example a list of
+       * checkboxes, are shown between the message and the buttons.
+       */
+      function showConfirmModal(title, message, onConfirm, details) {
         const modal = document.getElementById('confirm-modal');
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-message').textContent = message;
+        const detailsEl = document.getElementById('modal-details');
+        detailsEl.textContent = '';
+        if (details) {
+          detailsEl.appendChild(details);
+        }
         
         const confirmBtn = document.getElementById('modal-confirm-btn');
         const cancelBtn = document.getElementById('modal-cancel-btn');
@@ -646,16 +770,131 @@
         confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
         cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
         
+        modalReturnFocus = document.activeElement;
         modal.style.display = 'flex';
         
         newConfirmBtn.addEventListener('click', () => {
-          modal.style.display = 'none';
+          closeConfirmModal();
           onConfirm();
         });
         
         newCancelBtn.addEventListener('click', () => {
-          modal.style.display = 'none';
+          closeConfirmModal();
         });
+
+        // Keyboard and screen reader users start in the dialog.
+        modal.querySelector('input, button').focus();
+      }
+
+      function closeConfirmModal() {
+        document.getElementById('confirm-modal').style.display = 'none';
+        if (modalReturnFocus && document.body.contains(modalReturnFocus)) {
+          modalReturnFocus.focus();
+        }
+        modalReturnFocus = null;
+      }
+
+      // While the modal is open, Escape cancels and Tab stays in the modal.
+      document.addEventListener('keydown', function(event) {
+        const modal = document.getElementById('confirm-modal');
+        if (modal.style.display !== 'flex') {
+          return;
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeConfirmModal();
+          return;
+        }
+        if (event.key !== 'Tab') {
+          return;
+        }
+        const focusable = Array.from(modal.querySelectorAll('input, button'));
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      });
+
+      /** Hides the status message after a delay, unless a newer one is shown. */
+      let statusHideTimer = null;
+
+      /**
+       * Shows a message in the status bar. A new message replaces the previous
+       * one. If hideAfterMs is set, the message is hidden after it.
+       */
+      function showStatus(className, text, hideAfterMs) {
+        const statusEl = document.getElementById('status');
+        clearTimeout(statusHideTimer);
+        statusEl.className = className;
+        statusEl.style.visibility = 'visible';
+        statusEl.textContent = text;
+        if (hideAfterMs) {
+          statusHideTimer = setTimeout(hideStatus, hideAfterMs);
+        }
+        return statusEl;
+      }
+
+      function hideStatus() {
+        const statusEl = document.getElementById('status');
+        clearTimeout(statusHideTimer);
+        statusEl.style.visibility = 'hidden';
+        statusEl.className = '';
+        // Keeps the height of an empty status bar.
+        statusEl.innerHTML = '&nbsp;';
+      }
+
+      /**
+       * Shows that a task finished. A task can return {url, linkText,
+       * warnings}: the link and the notes to review stay in the status bar
+       * until they are dismissed or another task starts. Without them, the
+       * message is hidden after a few seconds.
+       */
+      function showTaskResult(result) {
+        const url = result && result.url;
+        const warnings = result && Array.isArray(result.warnings) ? result.warnings : [];
+        if (!url && warnings.length === 0) {
+          showStatus('success', 'Task completed successfully!', 4000);
+          return;
+        }
+        const statusEl = showStatus(warnings.length > 0 ? 'warning' : 'success', '');
+        statusEl.classList.add('has-details');
+        const summary = document.createElement('div');
+        summary.textContent = 'Task completed successfully!';
+        if (url) {
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.textContent = result.linkText || 'Open';
+          summary.append(' ', link);
+        }
+        statusEl.appendChild(summary);
+        if (warnings.length > 0) {
+          const intro = document.createElement('p');
+          intro.textContent = 'Please review the following:';
+          const list = document.createElement('ul');
+          warnings.forEach(function(warning) {
+            const item = document.createElement('li');
+            item.textContent = warning;
+            list.appendChild(item);
+          });
+          statusEl.append(intro, list);
+        }
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'status-close';
+        closeBtn.setAttribute('aria-label', 'Dismiss message');
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', function() {
+          hideStatus();
+          document.getElementById('search-input').focus();
+        });
+        statusEl.appendChild(closeBtn);
       }
 
       function runFunc(funcName, sheetName) {
@@ -667,48 +906,152 @@
           }
         }
 
-        const statusEl = document.getElementById('status');
-        statusEl.className = 'processing';
-        statusEl.style.visibility = 'visible';
-        statusEl.innerText = 'Processing...';
+        showStatus('processing', 'Processing...');
         
         google.script.run
-          .withSuccessHandler(function() {
-            statusEl.className = 'success';
-            statusEl.innerText = 'Task completed successfully!';
-            setTimeout(function() { statusEl.style.visibility = 'hidden'; }, 4000);
-          })
+          .withSuccessHandler(showTaskResult)
           .withFailureHandler(function(err) {
-            statusEl.className = 'error';
-            statusEl.innerText = 'Error: ' + err.message;
+            showStatus('error', 'Error: ' + err.message);
           })
           [funcName]();
       }
 
       function jumpToTab(sheetName, silent) {
-        const statusEl = document.getElementById('status');
-        
         if (!silent) {
-          statusEl.className = 'info';
-          statusEl.style.visibility = 'visible';
-          statusEl.innerText = 'Activating sheet...';
+          showStatus('info', 'Activating sheet...');
         }
         
         google.script.run
           .withSuccessHandler(function() {
             if (!silent) {
-              statusEl.className = 'success';
-              statusEl.innerText = 'Sheet activated!';
-              setTimeout(function() { statusEl.style.visibility = 'hidden'; }, 2000);
+              showStatus('success', 'Sheet activated!', 2000);
             }
           })
           .withFailureHandler(function(err) {
             if (!silent) {
-              statusEl.className = 'error';
-              statusEl.innerText = 'Error: ' + err.message;
+              showStatus('error', 'Error: ' + err.message);
             }
           })
           .activateSheetByName(sheetName);
+      }
+
+      /**
+       * Shows the sheets that the Settings Report uses and asks whether to
+       * update them and create the report.
+       */
+      function confirmSettingsReport() {
+        showStatus('info', 'Loading...');
+        google.script.run
+          .withSuccessHandler(function(plan) {
+            hideStatus();
+            showSettingsReportModal(plan);
+          })
+          .withFailureHandler(function(err) {
+            showStatus('error', 'Error: ' + err.message);
+          })
+          .getSettingsReportPlan();
+      }
+
+      function showSettingsReportModal(plan) {
+        const list = document.createElement('ul');
+        list.className = 'report-steps';
+        plan.steps.forEach(function(step) {
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = true;
+          checkbox.value = step.id;
+          const name = document.createElement('span');
+          name.className = 'report-step-name';
+          name.textContent = step.sheet;
+          const provides = document.createElement('span');
+          provides.className = 'report-step-provides';
+          provides.textContent = step.provides.charAt(0).toUpperCase() + step.provides.slice(1);
+          const text = document.createElement('span');
+          text.append(name, provides);
+          const label = document.createElement('label');
+          label.append(checkbox, text);
+          const item = document.createElement('li');
+          item.className = 'report-step';
+          item.appendChild(label);
+          list.appendChild(item);
+        });
+        const note = document.createElement('p');
+        note.className = 'modal-note';
+        note.textContent = 'Uncheck a sheet to use the information that is already in it. ' +
+          'Updating can take several minutes, so keep this sidebar open until the report is created.';
+        const details = document.createDocumentFragment();
+        details.append(list, note);
+
+        const count = plan.selectedProperties;
+        const message = count > 0 ?
+          'The report uses the information in these sheets. Proceed first updates them for the ' +
+            count + (count === 1 ? ' property' : ' properties') +
+            ' selected in Account Summaries, and then creates the report.' :
+          'No properties are selected in Account Summaries. Select the properties for the report ' +
+            'first, or uncheck all sheets to create the report from the information already in them.';
+        showConfirmModal('Create Settings Report', message, function() {
+          const checkedIds = Array.from(list.querySelectorAll('input:checked'))
+            .map(function(input) { return input.value; });
+          if (checkedIds.length > 0 && count === 0) {
+            showStatus('error', 'Error: Select at least one property in the Account Summaries sheet.');
+            return;
+          }
+          runSettingsReport(plan.steps.filter(function(step) {
+            return checkedIds.includes(step.id);
+          }));
+        }, details);
+      }
+
+      /**
+       * Updates the sheets one at a time, so that each update has its own
+       * Apps Script time limit, and then creates the report.
+       */
+      function runSettingsReport(steps) {
+        const button = document.getElementById('create-report-btn');
+        const autoJump = document.getElementById('toggle-auto-jump').checked;
+        const total = steps.length + 1;
+        const notes = [];
+        button.disabled = true;
+        if (autoJump) {
+          jumpToTab('Report Settings', true);
+        }
+        const finish = function() {
+          button.disabled = false;
+          if (autoJump) {
+            jumpToTab('Report Settings', true);
+          }
+        };
+        const runStep = function(index) {
+          if (index === steps.length) {
+            showStatus('processing', 'Step ' + total + ' of ' + total + ': Creating the report...');
+            google.script.run
+              .withSuccessHandler(function(result) {
+                finish();
+                result.warnings = notes.concat(result.warnings || []);
+                showTaskResult(result);
+              })
+              .withFailureHandler(function(err) {
+                finish();
+                showStatus('error', 'Error: ' + err.message);
+              })
+              .createHealthReportFromSidebar();
+            return;
+          }
+          const step = steps[index];
+          showStatus('processing', 'Step ' + (index + 1) + ' of ' + total + ': Updating ' + step.sheet + '...');
+          google.script.run
+            .withSuccessHandler(function() {
+              runStep(index + 1);
+            })
+            .withFailureHandler(function(err) {
+              // The report still uses the information that is in the sheet.
+              notes.push('The "' + step.sheet + '" sheet couldn\'t be updated, so its existing ' +
+                'information was used: ' + err.message);
+              runStep(index + 1);
+            })
+            .runSettingsReportStep(step.id);
+        };
+        runStep(0);
       }
 
       // Initialize settings on load
@@ -728,6 +1071,8 @@
           "Custom Metrics": "List or modify custom metrics. To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Update'/'Remove'). 3. Click 'Modify'.",
           "Calculated Metrics": "List or modify calculated metrics. To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Update'/'Remove'). 3. Click 'Modify'.",
           "Key Events": "List or modify key events (conversions). To modify: 1. Run 'List'. 2. Edit sheet (check 'Create'/'Remove'). 3. Click 'Modify'.",
+          "Custom Dimensions Checker": "Lists the custom dimensions of the selected properties with the number of events that collected each of them in the last 30 days, so you can find custom dimensions that are not collected. Select properties in 'Account Summaries' first.",
+          "Custom Metrics Checker": "Lists the custom metrics of the selected properties with their total value and the number of events that recorded them in the last 30 days, so you can find custom metrics that are not collected. Select properties in 'Account Summaries' first.",
           "Audience Definitions": "List or modify GA4 audience definitions. To modify: 1. Run 'List'. 2. Edit sheet. 3. Check 'Create'/'Remove'. 4. Click 'Modify'.",
           "Audience User Exports": "Process: 1. List audiences to get IDs. 2. Select audiences in sheet. 3. Click 'Create Audience Lists'. 4. Click 'Check States' until ready. 5. Click 'Export Data' to download.",
           "Users": "List or modify user access permissions. To modify: 1. Run 'List'. 2. Edit roles. 3. Check 'Create'/'Update'/'Remove'. 4. Click 'Modify'.",
@@ -743,7 +1088,7 @@
           "Expanded Data Sets": "List or modify expanded data sets. To modify: 1. Run 'List'. 2. Edit sheet. 3. Check 'Create'/'Remove'. 4. Click 'Modify'.",
           "User Access Report": "Run user access reports. Requires GA360 properties.",
           "Easy Property Creation": "Process: 1. Click 'List Templates' to set up sheet. 2. Fill in template rows. 3. Click 'Create Properties' to bulk create.",
-          "Health Report": "Generate a configuration health report. Requires you to select properties/streams first.",
+          "Settings Report": "Create a Google Slides report of the settings of the properties selected in 'Account Summaries'. It first lists the sheets it uses, such as Property Details and the Custom Dimensions Checker, and updates them when you proceed. Set it up in 'Report Settings'.",
           "Account Change History": "List administrative change history for selected GA4 accounts.",
           "Enable Full Spreadsheet Menu": "Show all configuration sheets and options in the spreadsheet's top menu. If disabled, only shows 'Show Sidebar'.",
           "Auto-Jump to Tab on Run": "Automatically activate and switch to the corresponding sheet tab when running a tool."

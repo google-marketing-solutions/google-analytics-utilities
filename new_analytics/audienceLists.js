@@ -290,12 +290,13 @@ function checkAudienceListsState() {
     audienceLists.forEach((audienceList, index) => {
       if (audienceList[audienceList.length - 3]) {
         const newAudienceListState = getAudienceListsRequest(audienceList[6]);
-        audienceListsSheet.getRange(index + 2, 8, 1, 4).setValues([[
-          parseAudienceListDimensionNames(newAudienceListState.dimensions),
-          newAudienceListState.beginCreatingTime,
-          newAudienceListState.state,
-          newAudienceListState.rowCount
-        ]]);
+        audienceListsSheet.getRange(index + 2, 8, 1, 4).setValues(
+          neutralizeFormulas([[
+            parseAudienceListDimensionNames(newAudienceListState.dimensions),
+            newAudienceListState.beginCreatingTime,
+            newAudienceListState.state,
+            newAudienceListState.rowCount
+          ]]));
         audienceListsSheet
         .getRange(index + 2, audienceListsSheet.getLastColumn())
         .setValue(`State Check Completed`);
@@ -321,13 +322,15 @@ function createAudienceLists() {
         }
         const newAudienceList = createAudienceListsRequest(
           `properties/${audienceList[3]}`, payload);
-        audienceListsSheet.getRange(index + 2, 7, 1, 5).setValues([[
-          newAudienceList.response.name,
-          parseAudienceListDimensionNames(newAudienceList.response.dimensions),
-          newAudienceList.response.beginCreatingTime,
-          newAudienceList.response.state,
-          newAudienceList.response.rowCount
-        ]]);
+        audienceListsSheet.getRange(index + 2, 7, 1, 5).setValues(
+          neutralizeFormulas([[
+            newAudienceList.response.name,
+            parseAudienceListDimensionNames(
+              newAudienceList.response.dimensions),
+            newAudienceList.response.beginCreatingTime,
+            newAudienceList.response.state,
+            newAudienceList.response.rowCount
+          ]]));
         audienceListsSheet
           .getRange(index + 2, audienceListsSheet.getLastColumn())
           .setValue(`${newAudienceList.response.name}: Created`);
@@ -366,7 +369,7 @@ function exportAudienceListsData() {
             newSpreadsheet
               .getSheets()[0] // Gets first sheet of new Spreadsheet
               .getRange(1, 2, formattedData.length, formattedData[0].length)
-              .setValues(formattedData)
+              .setValues(neutralizeFormulas(formattedData))
               .setNumberFormat('#.##########')
             // Save link to new spreadsheet to sheet.
             audienceListSheet
@@ -389,7 +392,7 @@ function exportAudienceListsData() {
             const newSheet = existingSpreadsheet.insertSheet(newSheetName);
             newSheet
               .getRange(1, 1, formattedData.length, formattedData[0].length)
-              .setValues(formattedData)
+              .setValues(neutralizeFormulas(formattedData))
               .setNumberFormat('#.##########');
             // Save link to the spreadsheet.
             audienceListSheet
