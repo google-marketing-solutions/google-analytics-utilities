@@ -29,7 +29,7 @@
 
 /** The ID of the default template presentation. */
 const SETTINGS_REPORT_TEMPLATE_ID =
-  '1r3hojR5hQkpu22zM4Gmb15p_uLbtZSUZrJQYQa-VATo';
+  '1FikbCtbaU4BLqH8477wpFHCLDUMWalnnWW1VSchsR1s';
 
 /** The name of the report if the "Report Name" setting is empty. */
 const SETTINGS_REPORT_DEFAULT_NAME = 'GA4 Settings Report';
