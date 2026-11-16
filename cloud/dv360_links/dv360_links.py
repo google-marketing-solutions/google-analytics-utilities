@@ -23,6 +23,8 @@ from collections.abc import MutableMapping, Sequence
 import enum
 import json
 import logging
+import re
+import uuid
 
 from cloudevents.http import CloudEvent
 import functions_framework
@@ -30,6 +32,15 @@ from google.analytics.admin import AnalyticsAdminServiceClient
 from google.analytics.admin_v1alpha.types import DisplayVideo360AdvertiserLink
 import google.cloud.logging
 import google.oauth2.credentials
+
+try:
+  from tadau import Tadau  # pylint: disable=g-import-not-at-top
+except ImportError:
+  Tadau = None
+
+_TELEMETRY_MEASUREMENT_ID = 'G-Z2TKLQZ79K'
+_TELEMETRY_API_SECRET = 'S7toNnNZQPWzViq44q_8gg'
+_TELEMETRY_APP_NAME = 'GA4 Toolkit'
 
 
 class Action(enum.Enum):
@@ -116,8 +127,56 @@ def main(cloud_event: CloudEvent) -> None:
   elif action == Action.LIST.value:
     parent = f"properties/{data['property_id']}"
     response = ga_client.list_display_video_360_advertiser_links(parent=parent)
+  if action in (Action.CREATE.value, Action.UPDATE.value, Action.DELETE.value):
+    _log_telemetry(data, action)
   logging.info(response or f"{data['name']} deleted")
   return response
+
+
+def _extract_numeric_id(raw_value: str) -> str:
+  """Extracts a bare numeric identifier from a resource name or ID string."""
+  if not raw_value:
+    return ''
+  raw_str = str(raw_value).strip()
+  match = re.search(r'properties/(\d+)', raw_str)
+  if match:
+    return match.group(1)
+  return re.sub(r'\D+', '', raw_str)
+
+
+def _log_telemetry(data: MutableMapping[str, str], action: str) -> None:
+  """Fails open to emit a SOLUTION_USAGE event via Tadau."""
+  try:
+    if Tadau is None:
+      return
+    property_id = _extract_numeric_id(
+        data.get('property_id') or data.get('name', '')
+    )
+    if not property_id:
+      return
+    event = {
+        'name': 'SOLUTION_USAGE',
+        'external_event_id': str(uuid.uuid4()),
+        'th_analytics_property_id': property_id,
+        'label': f'cloud_dv360_links_{action}',
+    }
+    if data.get('opportunity_id'):
+      opp_id = _extract_numeric_id(data['opportunity_id'])
+      if opp_id:
+        event['th_opportunity_id'] = opp_id
+    tadau_client = Tadau(
+        api_secret=_TELEMETRY_API_SECRET,
+        measurement_id=_TELEMETRY_MEASUREMENT_ID,
+        opt_in=True,
+        fixed_dimensions={
+            'app': _TELEMETRY_APP_NAME,
+            'is_agent_event': False,
+            'non_personalized_ads': False,
+        },
+    )
+    tadau_client.send_events([event])
+  except Exception:  # pylint: disable=broad-exception-caught
+    pass
 
 
 def _find_missing_keys(data: MutableMapping[str, str]) -> Sequence[str]:

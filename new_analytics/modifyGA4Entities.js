@@ -201,6 +201,10 @@ function modifyGA4Entities(sheetName) {
 
 
   if (entities.length > 0) {
+    const mutatedAccountIds = [];
+    const mutatedPropertyIds = [];
+    let hasSuccessfulMutation = false;
+
     entities.forEach((entity, index) => {
       const responses = [];
       const remove = entity[entity.length - 4];
@@ -399,7 +403,31 @@ function modifyGA4Entities(sheetName) {
         actionTaken = responseCheck(responses, 'update');
         writeActionTakenToSheet(sheetName, index, actionTaken);
       }
+
+      if (actionTaken &&
+          actionTaken !== apiActionTaken.ga4.skipped &&
+          !String(actionTaken).startsWith('Error')) {
+        hasSuccessfulMutation = true;
+        if (entity[1]) {
+          mutatedAccountIds.push(entity[1]);
+        }
+        if (entity[3]) {
+          mutatedPropertyIds.push(entity[3]);
+        } else if (
+            responses.length > 0 && responses[0] && responses[0].name &&
+            String(responses[0].name).indexOf('properties/') === 0) {
+          mutatedPropertyIds.push(responses[0].name);
+        }
+      }
     });
+
+    if (hasSuccessfulMutation && typeof Telemetry !== 'undefined') {
+      Telemetry.logSolutionUsage({
+        accountIds: mutatedAccountIds,
+        propertyIds: mutatedPropertyIds,
+        label: sheetName,
+      });
+    }
   }
 }
 

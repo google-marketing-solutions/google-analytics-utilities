@@ -100,7 +100,14 @@ function listAllGA4PropertyResources() {
     writeGA4RollupPropertySourceLinksToSheet();
     writeGA4SubpropertyEventFiltersToSheet();
     writeGA4AnnotationsToSheet();
-
+    if (typeof Telemetry !== 'undefined') {
+      const selectedProperties = getSelectedGa4Properties();
+      Telemetry.logSheetsReportGenerated({
+        accountIds: selectedProperties.map(row => row[1]),
+        propertyIds: selectedProperties.map(row => row[3]),
+        label: 'List All Property Settings',
+      });
+    }
 }
 
 /**

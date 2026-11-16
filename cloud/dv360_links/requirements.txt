@@ -2,3 +2,4 @@ functions-framework==3.*
 google-auth
 google-analytics-admin
 google-cloud-logging
+tadau
