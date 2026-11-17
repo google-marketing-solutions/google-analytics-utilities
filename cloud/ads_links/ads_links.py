@@ -131,6 +131,14 @@ def _extract_numeric_id(raw_value: str) -> str:
   return re.sub(r'\D+', '', raw_str)
 
 
+def _format_external_ads_customer_id(raw_value: str) -> str:
+  """Formats a 10-digit external Google Ads Customer ID as XXX-XXX-XXXX."""
+  digits = _extract_numeric_id(raw_value)
+  if len(digits) == 10:
+    return f'{digits[:3]}-{digits[3:6]}-{digits[6:]}'
+  return digits
+
+
 def _log_telemetry(data: Dict[str, str], action: str) -> None:
   """Fails open to emit a SOLUTION_USAGE event via Tadau."""
   try:
@@ -139,7 +147,7 @@ def _log_telemetry(data: Dict[str, str], action: str) -> None:
     property_id = _extract_numeric_id(
         data.get('property_id') or data.get('name', '')
     )
-    customer_id = _extract_numeric_id(data.get('customer_id', ''))
+    customer_id = _format_external_ads_customer_id(data.get('customer_id', ''))
     if not property_id and not customer_id:
       return
     event = {

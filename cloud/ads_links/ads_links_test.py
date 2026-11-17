@@ -41,7 +41,7 @@ class GoogleAdsLinksTest(parameterized.TestCase):
         'token_uri': 'google.com',
         'scopes': ['https://www.googleapis.com/auth/analytics.edit'],
         'enable_logging': True,
-        'customer_id': '123',
+        'customer_id': '1234567890',
         'action': 'create',
         'ads_personalization_enabled': True,
         'property_id': '1234567',
@@ -130,7 +130,9 @@ class GoogleAdsLinksTest(parameterized.TestCase):
     self.assertLen(sent_events, 1)
     self.assertEqual(sent_events[0]['name'], 'SOLUTION_USAGE')
     self.assertEqual(sent_events[0]['th_analytics_property_id'], '1234567')
-    self.assertEqual(sent_events[0]['th_google_ads_customer_id'], '123')
+    self.assertEqual(
+        sent_events[0]['th_google_ads_customer_id'], '123-456-7890'
+    )
 
     # Verify fail-open resilience when Tadau raises an exception
     mock_tadau.return_value.send_events.side_effect = RuntimeError('Network error')

@@ -162,6 +162,26 @@ def _normalize_numeric_ids(raw_values):
     return ','.join(cleaned)
 
 
+def _format_external_ads_customer_ids(raw_values):
+    seen = set()
+    cleaned = []
+    for val in raw_values:
+        if val is None:
+            continue
+        digits = re.sub(r'\D+', '', str(val))
+        if not digits:
+            continue
+        formatted = (
+            f'{digits[:3]}-{digits[3:6]}-{digits[6:]}'
+            if len(digits) == 10
+            else digits
+        )
+        if formatted not in seen:
+            seen.add(formatted)
+            cleaned.append(formatted)
+    return ','.join(cleaned)
+
+
 def _log_batch_telemetry(responses):
     """Fails open to emit a SOLUTION_USAGE event via Tadau for created links."""
     try:
@@ -171,7 +191,7 @@ def _log_batch_telemetry(responses):
         if not created:
             return
         prop_ids = _normalize_numeric_ids([r.get('ga_propety_id') for r in created])
-        ads_cids = _normalize_numeric_ids([
+        ads_cids = _format_external_ads_customer_ids([
             r.get('platform_id') for r in created if r.get('type') == 'ads'
         ])
         if not prop_ids and not ads_cids:
