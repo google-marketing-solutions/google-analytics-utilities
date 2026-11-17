@@ -55,7 +55,7 @@ It is strongly recommended that you use the template spreadsheet to use the Goog
 1. Join [this group](https://groups.google.com/g/google-analytics-utilities-users) to access the spreadsheet.
 2. Create a copy of [this spreadsheet](https://docs.google.com/spreadsheets/d/1kJqwYNed8RTuAgjy0aRUooD__MIPqzUeiDF5LZ7v1aI/copy).
 
-The spreadsheet is now ready to use the Google Analytics Utilities script. The first time you run a function from the menu, you will need to authorize the permissions for the script and then run the function a second time. You may see a warning that the script is unauthorized. You should be able to proceed anyway. The script does not collect any information.
+The spreadsheet is now ready to use the Google Analytics Utilities script. The first time you run a function from the menu, you will need to authorize the permissions for the script and then run the function a second time. You may see a warning that the script is unauthorized. You should be able to proceed anyway. See [Privacy & Usage Telemetry](#privacy--usage-telemetry) for details on anonymous usage telemetry and how to opt out.
 
 ### APIs and Access Permissions
 
@@ -1335,3 +1335,17 @@ Please note:
 
 - GA4 only collects data for a custom definition after it has been created, so definitions created in the last 30 days will have lower counts.
 - The checker sends one [GA4 Data API](https://developers.google.com/analytics/devguides/reporting/data/v1/quotas) request per custom definition, which counts towards the property's Data API quota.
+
+
+## Privacy & Usage Telemetry
+
+Google Analytics Utilities (`GA4 Toolkit`) includes lightweight, fail-open usage telemetry via [`tadau`](https://github.com/google-marketing-solutions/tadau) and the Google Analytics 4 Measurement Protocol (`G-Z2TKLQZ79K`) to help maintain and improve this solution.
+
+### Compliance & Privacy Guardrails
+- **No Customer PII:** Telemetry never collects or transmits user email addresses, names, OAuth credentials, or spreadsheet cell contents. Each spreadsheet copy uses a randomly generated anonymous UUID (`TH_ANON_CLIENT_ID` in `DocumentProperties`) and a random UUID per event (`external_event_id`).
+- **Identifiers Collected:** Events (`SOLUTION_USAGE`, `SHEETS_REPORT_GENERATED`, and `SLIDES_REPORT_GENERATED` under `fixed_dimensions.app = "GA4 Toolkit"`) only include the action label and product resource identifiers (`th_analytics_property_id`, `th_analytics_account_id`, and external Google Ads Customer IDs in `th_google_ads_customer_id` formatted with hyphens preserved as `XXX-XXX-XXXX`, e.g., `123-456-7890`).
+- **Fail-Open Design:** All telemetry dispatches are wrapped in `try / catch` blocks with `muteHttpExceptions: true` so network or endpoint errors never interrupt or block user workflows.
+- **Opt-In / Opt-Out Configuration:**
+  - **Google Sheets Apps Script (`shared/Telemetry.gs`):** Enabled by default (`opt_in = true`). To opt out for a spreadsheet copy, run `Telemetry.setOptIn(false)` in the Apps Script editor (or set the `TH_OPT_IN` document property to `'false'`).
+  - **Python Cloud Functions (`cloud/`):** Controlled via the `opt_in` parameter on `Tadau(..., opt_in=True)` and the `TELEMETRY_OPT_IN` environment variable (set `TELEMETRY_OPT_IN=false` on the Cloud Function or pass `"opt_in": false` in the Pub/Sub JSON payload to disable telemetry).
+

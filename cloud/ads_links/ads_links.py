@@ -22,12 +22,24 @@ on the action and settings values in the pub/sub message.
 import base64
 import enum
 import json
-from typing import List, Dict
+import os
+import re
+from typing import Any, Dict, List
+import uuid
 from cloudevents.http import CloudEvent
 import functions_framework
 from google.analytics.admin import AnalyticsAdminServiceClient
 from google.analytics.admin_v1alpha.types import GoogleAdsLink
 import google.oauth2.credentials
+
+try:
+  from tadau import Tadau  # pylint: disable=g-import-not-at-top
+except ImportError:
+  Tadau = None
+
+_TELEMETRY_MEASUREMENT_ID = 'G-Z2TKLQZ79K'
+_TELEMETRY_API_SECRET = 'S7toNnNZQPWzViq44q_8gg'
+_TELEMETRY_APP_NAME = 'GA4 Toolkit'
 
 
 class Action(enum.Enum):
@@ -102,9 +114,85 @@ def main(cloud_event: CloudEvent) -> None:
   elif action == Action.LIST.value:
     parent = f"properties/{data['property_id']}"
     response = ga_client.list_google_ads_links(parent=parent)
+  if action in (Action.CREATE.value, Action.UPDATE.value, Action.DELETE.value):
+    _log_telemetry(data, action)
   if data['enable_logging']:
     print(response or f"{data['name']} deleted")
   return response
+
+
+def _extract_numeric_id(raw_value: str) -> str:
+  """Extracts a bare numeric identifier from a resource name or ID string."""
+  if not raw_value:
+    return ''
+  raw_str = str(raw_value).strip()
+  match = re.search(r'properties/(\d+)', raw_str)
+  if match:
+    return match.group(1)
+  return re.sub(r'\D+', '', raw_str)
+
+
+def _format_external_ads_customer_id(raw_value: str) -> str:
+  """Formats a 10-digit external Google Ads Customer ID as XXX-XXX-XXXX."""
+  digits = _extract_numeric_id(raw_value)
+  if len(digits) == 10:
+    return f'{digits[:3]}-{digits[3:6]}-{digits[6:]}'
+  return digits
+
+
+def _is_telemetry_opt_in(data: Dict[str, Any]) -> bool:
+  """Returns whether usage telemetry is enabled via message payload or env."""
+  if 'opt_in' in data and data['opt_in'] is not None:
+    if isinstance(data['opt_in'], bool):
+      return data['opt_in']
+    return str(data['opt_in']).strip().lower() not in ('false', '0', 'no')
+  return os.environ.get('TELEMETRY_OPT_IN', 'true').strip().lower() not in (
+      'false',
+      '0',
+      'no',
+  )
+
+
+def _log_telemetry(data: Dict[str, str], action: str) -> None:
+  """Fails open to emit a SOLUTION_USAGE event via Tadau."""
+  try:
+    if Tadau is None:
+      return
+    opt_in = _is_telemetry_opt_in(data)
+    if not opt_in:
+      return
+    property_id = _extract_numeric_id(
+        data.get('property_id') or data.get('name', '')
+    )
+    customer_id = _format_external_ads_customer_id(data.get('customer_id', ''))
+    if not property_id and not customer_id:
+      return
+    event = {
+        'name': 'SOLUTION_USAGE',
+        'external_event_id': str(uuid.uuid4()),
+        'label': f'cloud_ads_links_{action}',
+    }
+    if property_id:
+      event['th_analytics_property_id'] = property_id
+    if customer_id:
+      event['th_google_ads_customer_id'] = customer_id
+    if data.get('opportunity_id'):
+      opp_id = _extract_numeric_id(data['opportunity_id'])
+      if opp_id:
+        event['th_opportunity_id'] = opp_id
+    tadau_client = Tadau(
+        api_secret=_TELEMETRY_API_SECRET,
+        measurement_id=_TELEMETRY_MEASUREMENT_ID,
+        opt_in=opt_in,
+        fixed_dimensions={
+            'app': _TELEMETRY_APP_NAME,
+            'is_agent_event': False,
+            'non_personalized_ads': False,
+        },
+    )
+    tadau_client.send_events([event])
+  except Exception:  # pylint: disable=broad-exception-caught
+    pass
 
 
 def find_missing_keys(data: Dict[str, str]) -> List[str]:

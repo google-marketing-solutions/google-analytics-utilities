@@ -41,12 +41,15 @@ class GoogleAdsLinksTest(parameterized.TestCase):
         'token_uri': 'google.com',
         'scopes': ['https://www.googleapis.com/auth/analytics.edit'],
         'enable_logging': True,
-        'customer_id': '123',
+        'customer_id': '1234567890',
         'action': 'create',
         'ads_personalization_enabled': True,
         'property_id': '1234567',
         'name': 'properties/1234567/adsLinks/abcdefg',
     }
+    self.mock_tadau = self.enter_context(
+        unittest.mock.patch.object(ads_links, 'Tadau')
+    )
 
   def test_main_missing_data_raises_error(self):
     missing_data = CloudEvent(self.attributes, {'message': {}})
@@ -101,6 +104,55 @@ class GoogleAdsLinksTest(parameterized.TestCase):
     elif action == 'list':
       mock_ga_client().list_google_ads_links.return_value = result
     self.assertEqual(result, ads_links.main(cloud_event))
+
+  @unittest.mock.patch('ads_links.Tadau')
+  @unittest.mock.patch('ads_links.get_ga_client')
+  def test_main_emits_telemetry_and_fails_open(
+      self, mock_ga_client, mock_tadau
+  ):
+    mock_ga_client().create_google_ads_link.return_value = 'created'
+    encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
+    cloud_event = CloudEvent(
+        self.attributes, {'message': {'data': encoded_data}}
+    )
+    self.assertEqual('created', ads_links.main(cloud_event))
+    mock_tadau.assert_called_once_with(
+        api_secret='S7toNnNZQPWzViq44q_8gg',
+        measurement_id='G-Z2TKLQZ79K',
+        opt_in=True,
+        fixed_dimensions={
+            'app': 'GA4 Toolkit',
+            'is_agent_event': False,
+            'non_personalized_ads': False,
+        },
+    )
+    sent_events = mock_tadau.return_value.send_events.call_args[0][0]
+    self.assertLen(sent_events, 1)
+    self.assertEqual(sent_events[0]['name'], 'SOLUTION_USAGE')
+    self.assertEqual(sent_events[0]['th_analytics_property_id'], '1234567')
+    self.assertEqual(
+        sent_events[0]['th_google_ads_customer_id'], '123-456-7890'
+    )
+
+    # Verify fail-open resilience when Tadau raises an exception
+    mock_tadau.return_value.send_events.side_effect = RuntimeError('Network error')
+    self.assertEqual('created', ads_links.main(cloud_event))
+
+    # Verify opt_in=False skips telemetry dispatch
+    mock_tadau.reset_mock()
+    self.data['opt_in'] = False
+    opt_out_event = CloudEvent(
+        self.attributes,
+        {
+            'message': {
+                'data': base64.b64encode(
+                    json.dumps(self.data).encode('utf-8')
+                )
+            }
+        },
+    )
+    self.assertEqual('created', ads_links.main(opt_out_event))
+    mock_tadau.assert_not_called()
 
 
 if __name__ == '__main__':

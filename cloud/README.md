@@ -101,3 +101,11 @@ The ads\_customer\_id values should not contain dashes.
 
 The ads\_personalization\_enabled, dv360\_campaign\_data\_sharing\_enabled, and dv360\_cost\_data\_sharing\_enabled columns should only be set to true or false.
 
+### Privacy & Usage Telemetry
+
+The Cloud Functions (`ads_links`, `dv360_links`, and `linker`) use [`tadau`](https://github.com/google-marketing-solutions/tadau) (`fixed_dimensions.app = "GA4 Toolkit"`) to emit fail-open `SOLUTION_USAGE` events with no customer PII:
+
+- **No Customer PII:** Never sends user emails, OAuth tokens, or account names. Only sends a random `external_event_id` UUID, `th_analytics_property_id`, and (for Google Ads links) the 10-digit external Google Ads Customer ID in `th_google_ads_customer_id` with hyphens preserved (`XXX-XXX-XXXX`, e.g., `123-456-7890`).
+- **Opt-In / Opt-Out Flag:** Passed to `Tadau(..., opt_in=...)`. Enabled by default (`TELEMETRY_OPT_IN=true`); set the environment variable `TELEMETRY_OPT_IN=false` on the Cloud Function (or pass `"opt_in": false` in the message payload) to disable telemetry.
+
+

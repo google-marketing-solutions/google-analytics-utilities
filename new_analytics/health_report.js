@@ -346,6 +346,13 @@ function createSettingsReport_(options) {
   presentation.saveAndClose();
 
   addSettingsReportToList_(settings.reportName, file.getUrl());
+  if (typeof Telemetry !== 'undefined') {
+    Telemetry.logSlidesReportGenerated({
+      accountIds: data.properties.map(row => row[1]),
+      propertyIds: data.properties.map(row => row[3]),
+      label: settings.reportName,
+    });
+  }
   console.log(`Settings report created: ${file.getUrl()}`);
   warnings.forEach(warning => console.log(warning));
   return {

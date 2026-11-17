@@ -55,6 +55,9 @@ class DV360LinksTest(absltest.TestCase):
             dv360_links.google.cloud.logging, 'Client', autospec=True
         )
     )
+    self.mock_tadau = self.enter_context(
+        unittest.mock.patch.object(dv360_links, 'Tadau')
+    )
 
   def test_main_missing_data_raises_error(self):
     missing_data = CloudEvent(self.attributes, {'message': {}})
@@ -73,7 +76,7 @@ class DV360LinksTest(absltest.TestCase):
 
   @unittest.mock.patch('dv360_links.AnalyticsAdminServiceClient')
   def test_get_ga_client_creates_admin_client(self, mock_analytics_client):
-    dv360_links.get_ga_client(
+    dv360_links._get_ga_client(
         self.data['refresh_token'],
         self.data['token_uri'],
         self.data['client_id'],
@@ -82,7 +85,7 @@ class DV360LinksTest(absltest.TestCase):
     )
     mock_analytics_client.assert_called()
 
-  @unittest.mock.patch('dv360_links.get_ga_client')
+  @unittest.mock.patch('dv360_links._get_ga_client')
   def test_main_calls_create_dv360_link(self, mock_ga_client):
     encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
     cloud_event = CloudEvent(
@@ -94,7 +97,7 @@ class DV360LinksTest(absltest.TestCase):
     )
     self.assertEqual(result, dv360_links.main(cloud_event))
 
-  @unittest.mock.patch('dv360_links.get_ga_client')
+  @unittest.mock.patch('dv360_links._get_ga_client')
   def test_main_calls_update_dv360_link(self, mock_ga_client):
     self.data['action'] = 'update'
     encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
@@ -107,7 +110,7 @@ class DV360LinksTest(absltest.TestCase):
     )
     self.assertEqual(result, dv360_links.main(cloud_event))
 
-  @unittest.mock.patch('dv360_links.get_ga_client')
+  @unittest.mock.patch('dv360_links._get_ga_client')
   def test_main_calls_delete_dv360_link(self, mock_ga_client):
     self.data['action'] = 'delete'
     encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
@@ -120,7 +123,7 @@ class DV360LinksTest(absltest.TestCase):
     )
     self.assertEqual(result, dv360_links.main(cloud_event))
 
-  @unittest.mock.patch('dv360_links.get_ga_client')
+  @unittest.mock.patch('dv360_links._get_ga_client')
   def test_main_calls_list_dv360_links(self, mock_ga_client):
     self.data['action'] = 'list'
     encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
@@ -132,6 +135,38 @@ class DV360LinksTest(absltest.TestCase):
         result
     )
     self.assertEqual(result, dv360_links.main(cloud_event))
+
+  @unittest.mock.patch('dv360_links.Tadau')
+  @unittest.mock.patch('dv360_links._get_ga_client')
+  def test_main_emits_telemetry_and_fails_open(
+      self, mock_ga_client, mock_tadau
+  ):
+    mock_ga_client().create_display_video_360_advertiser_link.return_value = (
+        'created'
+    )
+    encoded_data = base64.b64encode(json.dumps(self.data).encode('utf-8'))
+    cloud_event = CloudEvent(
+        self.attributes, {'message': {'data': encoded_data}}
+    )
+    self.assertEqual('created', dv360_links.main(cloud_event))
+    mock_tadau.assert_called_once_with(
+        api_secret='S7toNnNZQPWzViq44q_8gg',
+        measurement_id='G-Z2TKLQZ79K',
+        opt_in=True,
+        fixed_dimensions={
+            'app': 'GA4 Toolkit',
+            'is_agent_event': False,
+            'non_personalized_ads': False,
+        },
+    )
+    sent_events = mock_tadau.return_value.send_events.call_args[0][0]
+    self.assertLen(sent_events, 1)
+    self.assertEqual(sent_events[0]['name'], 'SOLUTION_USAGE')
+    self.assertEqual(sent_events[0]['th_analytics_property_id'], '1234567')
+
+    # Verify fail-open resilience when Tadau raises an exception
+    mock_tadau.return_value.send_events.side_effect = RuntimeError('Network error')
+    self.assertEqual('created', dv360_links.main(cloud_event))
 
 
 if __name__ == '__main__':
