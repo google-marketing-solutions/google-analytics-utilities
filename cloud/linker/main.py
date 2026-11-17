@@ -187,6 +187,13 @@ def _log_batch_telemetry(responses):
     try:
         if Tadau is None or not responses:
             return
+        opt_in = os.environ.get('TELEMETRY_OPT_IN', 'true').strip().lower() not in (
+            'false',
+            '0',
+            'no',
+        )
+        if not opt_in:
+            return
         created = [r for r in responses if r.get('result') == 'created']
         if not created:
             return
@@ -208,7 +215,7 @@ def _log_batch_telemetry(responses):
         tadau_client = Tadau(
             api_secret=_TELEMETRY_API_SECRET,
             measurement_id=_TELEMETRY_MEASUREMENT_ID,
-            opt_in=True,
+            opt_in=opt_in,
             fixed_dimensions={
                 'app': _TELEMETRY_APP_NAME,
                 'is_agent_event': False,

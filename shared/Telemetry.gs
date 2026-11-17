@@ -33,12 +33,48 @@ const Telemetry = (() => {
   // corp/gtech/ads/infrastructure/telemetry_hub/solutions/google-analytics-utilities.gcl
   const APP_NAME_ = 'GA4 Toolkit';
   const DOC_PROP_CLIENT_ID_KEY_ = 'TH_ANON_CLIENT_ID';
+  const DOC_PROP_OPT_IN_KEY_ = 'TH_OPT_IN';
 
   const EventType = {
     SOLUTION_USAGE: 'SOLUTION_USAGE',
     SHEETS_REPORT_GENERATED: 'SHEETS_REPORT_GENERATED',
     SLIDES_REPORT_GENERATED: 'SLIDES_REPORT_GENERATED',
   };
+
+  /**
+   * Returns whether usage telemetry collection is enabled (opt-in defaults to
+   * true unless explicitly disabled in DocumentProperties).
+   * @return {boolean} True if telemetry is enabled.
+   */
+  function isOptIn() {
+    try {
+      const docProps = PropertiesService.getDocumentProperties();
+      if (docProps) {
+        const raw = docProps.getProperty(DOC_PROP_OPT_IN_KEY_);
+        if (raw !== null && raw !== undefined && raw !== '') {
+          return String(raw).toLowerCase() !== 'false';
+        }
+      }
+    } catch (e) {
+      // Ignore storage access errors and default to opt-in.
+    }
+    return true;
+  }
+
+  /**
+   * Sets whether usage telemetry collection is enabled for this spreadsheet.
+   * @param {boolean} enabled True to opt in, false to opt out.
+   */
+  function setOptIn(enabled) {
+    try {
+      const docProps = PropertiesService.getDocumentProperties();
+      if (docProps) {
+        docProps.setProperty(DOC_PROP_OPT_IN_KEY_, enabled ? 'true' : 'false');
+      }
+    } catch (e) {
+      // Ignore storage errors silently.
+    }
+  }
 
   /**
    * Returns an anonymous, per-spreadsheet-copy UUID persisted in
@@ -92,6 +128,37 @@ const Telemetry = (() => {
   }
 
   /**
+   * Normalizes external Google Ads Customer IDs into a deduplicated
+   * comma-separated string with hyphens preserved (XXX-XXX-XXXX, e.g.,
+   * '123-456-7890') as required by Telemetry Hub for external CIDs.
+   *
+   * @param {string|number|!Array<string|number>|null|undefined} rawIds
+   * @return {string} Comma-separated formatted Customer IDs, or empty string.
+   */
+  function normalizeExternalAdsCustomerIds_(rawIds) {
+    if (rawIds === null || rawIds === undefined || rawIds === '') {
+      return '';
+    }
+    const items = Array.isArray(rawIds) ? rawIds : String(rawIds).split(',');
+    const seen = {};
+    const cleaned = [];
+    for (let i = 0; i < items.length; i++) {
+      const raw = String(items[i] == null ? '' : items[i]).trim();
+      if (!raw) continue;
+      const digits = raw.replace(/\D+/g, '');
+      if (!digits) continue;
+      const formatted = digits.length === 10 ?
+          `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}` :
+          digits;
+      if (!seen[formatted]) {
+        seen[formatted] = true;
+        cleaned.push(formatted);
+      }
+    }
+    return cleaned.join(',');
+  }
+
+  /**
    * Builds the GA4 Measurement Protocol payload expected by Telemetry Hub's
    * Tadau ingestion pipeline (tadau_extract.sql & tadau_import.sql).
    *
@@ -107,10 +174,14 @@ const Telemetry = (() => {
         opts.propertyIds || opts.propertyId || opts.th_analytics_property_id);
     const accountIds = normalizeNumericIds_(
         opts.accountIds || opts.accountId || opts.th_analytics_account_id);
+    const googleAdsCustomerIds = normalizeExternalAdsCustomerIds_(
+        opts.googleAdsCustomerIds || opts.googleAdsCustomerId ||
+        opts.th_google_ads_customer_id);
     const opportunityIds = normalizeNumericIds_(
         opts.opportunityIds || opts.opportunityId || opts.th_opportunity_id);
 
-    if (!propertyIds && !accountIds && !opportunityIds) {
+    if (!propertyIds && !accountIds && !googleAdsCustomerIds &&
+        !opportunityIds) {
       return null;
     }
 
@@ -127,6 +198,9 @@ const Telemetry = (() => {
     }
     if (accountIds) {
       eventParams.th_analytics_account_id = accountIds;
+    }
+    if (googleAdsCustomerIds) {
+      eventParams.th_google_ads_customer_id = googleAdsCustomerIds;
     }
     if (opportunityIds) {
       eventParams.th_opportunity_id = opportunityIds;
@@ -155,13 +229,17 @@ const Telemetry = (() => {
    * @param {string} eventName Event type ('SOLUTION_USAGE',
    *     'SHEETS_REPORT_GENERATED', or 'SLIDES_REPORT_GENERATED').
    * @param {!Object=} options Identifiers ({propertyIds, accountIds,
-   *     opportunityIds, label}).
+   *     googleAdsCustomerIds, opportunityIds, label}).
    * @param {boolean=} useDebugEndpoint True to call /debug/mp/collect.
    * @return {?GoogleAppsScript.URL_Fetch.HTTPResponse} Response or null.
    */
   function sendEvent_(eventName, options, useDebugEndpoint) {
     try {
-      const payload = buildPayload_(eventName, options);
+      const opts = options || {};
+      if (opts.optIn === false || !isOptIn()) {
+        return null;
+      }
+      const payload = buildPayload_(eventName, opts);
       if (!payload) {
         return null;
       }
@@ -193,10 +271,13 @@ const Telemetry = (() => {
 
   return {
     EventType: EventType,
+    isOptIn: isOptIn,
+    setOptIn: setOptIn,
     logSolutionUsage: logSolutionUsage,
     logSheetsReportGenerated: logSheetsReportGenerated,
     logSlidesReportGenerated: logSlidesReportGenerated,
     normalizeNumericIds_: normalizeNumericIds_,
+    normalizeExternalAdsCustomerIds_: normalizeExternalAdsCustomerIds_,
     buildPayload_: buildPayload_,
     sendDebugEvent_: (eventName, options) =>
         sendEvent_(eventName, options, true),
@@ -211,6 +292,7 @@ function testTelemetry_() {
   const testOptions = {
     propertyIds: ['properties/123456789', '987654321', 'properties/123456789'],
     accountIds: 'accounts/555666777',
+    googleAdsCustomerIds: ['1234567890', '123-456-7890'],
     opportunityIds: '888999000',
     label: 'unit_test_validation',
   };

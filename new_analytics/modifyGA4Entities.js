@@ -203,6 +203,7 @@ function modifyGA4Entities(sheetName) {
   if (entities.length > 0) {
     const mutatedAccountIds = [];
     const mutatedPropertyIds = [];
+    const mutatedAdsCustomerIds = [];
     let hasSuccessfulMutation = false;
 
     entities.forEach((entity, index) => {
@@ -418,6 +419,9 @@ function modifyGA4Entities(sheetName) {
             String(responses[0].name).indexOf('properties/') === 0) {
           mutatedPropertyIds.push(responses[0].name);
         }
+        if (sheetName == sheetsMeta.ga4.googleAdsLinks.sheetName && entity[4]) {
+          mutatedAdsCustomerIds.push(entity[4]);
+        }
       }
     });
 
@@ -425,6 +429,7 @@ function modifyGA4Entities(sheetName) {
       Telemetry.logSolutionUsage({
         accountIds: mutatedAccountIds,
         propertyIds: mutatedPropertyIds,
+        googleAdsCustomerIds: mutatedAdsCustomerIds,
         label: sheetName,
       });
     }

@@ -138,6 +138,22 @@ class GoogleAdsLinksTest(parameterized.TestCase):
     mock_tadau.return_value.send_events.side_effect = RuntimeError('Network error')
     self.assertEqual('created', ads_links.main(cloud_event))
 
+    # Verify opt_in=False skips telemetry dispatch
+    mock_tadau.reset_mock()
+    self.data['opt_in'] = False
+    opt_out_event = CloudEvent(
+        self.attributes,
+        {
+            'message': {
+                'data': base64.b64encode(
+                    json.dumps(self.data).encode('utf-8')
+                )
+            }
+        },
+    )
+    self.assertEqual('created', ads_links.main(opt_out_event))
+    mock_tadau.assert_not_called()
+
 
 if __name__ == '__main__':
   absltest.main()

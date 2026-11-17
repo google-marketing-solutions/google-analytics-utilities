@@ -23,6 +23,7 @@ from collections.abc import MutableMapping, Sequence
 import enum
 import json
 import logging
+import os
 import re
 import uuid
 
@@ -144,10 +145,26 @@ def _extract_numeric_id(raw_value: str) -> str:
   return re.sub(r'\D+', '', raw_str)
 
 
+def _is_telemetry_opt_in(data: MutableMapping[str, str]) -> bool:
+  """Returns whether usage telemetry is enabled via message payload or env."""
+  if 'opt_in' in data and data['opt_in'] is not None:
+    if isinstance(data['opt_in'], bool):
+      return data['opt_in']
+    return str(data['opt_in']).strip().lower() not in ('false', '0', 'no')
+  return os.environ.get('TELEMETRY_OPT_IN', 'true').strip().lower() not in (
+      'false',
+      '0',
+      'no',
+  )
+
+
 def _log_telemetry(data: MutableMapping[str, str], action: str) -> None:
   """Fails open to emit a SOLUTION_USAGE event via Tadau."""
   try:
     if Tadau is None:
+      return
+    opt_in = _is_telemetry_opt_in(data)
+    if not opt_in:
       return
     property_id = _extract_numeric_id(
         data.get('property_id') or data.get('name', '')
@@ -167,7 +184,7 @@ def _log_telemetry(data: MutableMapping[str, str], action: str) -> None:
     tadau_client = Tadau(
         api_secret=_TELEMETRY_API_SECRET,
         measurement_id=_TELEMETRY_MEASUREMENT_ID,
-        opt_in=True,
+        opt_in=opt_in,
         fixed_dimensions={
             'app': _TELEMETRY_APP_NAME,
             'is_agent_event': False,

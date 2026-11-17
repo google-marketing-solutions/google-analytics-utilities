@@ -22,8 +22,9 @@ on the action and settings values in the pub/sub message.
 import base64
 import enum
 import json
+import os
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 import uuid
 from cloudevents.http import CloudEvent
 import functions_framework
@@ -139,10 +140,26 @@ def _format_external_ads_customer_id(raw_value: str) -> str:
   return digits
 
 
+def _is_telemetry_opt_in(data: Dict[str, Any]) -> bool:
+  """Returns whether usage telemetry is enabled via message payload or env."""
+  if 'opt_in' in data and data['opt_in'] is not None:
+    if isinstance(data['opt_in'], bool):
+      return data['opt_in']
+    return str(data['opt_in']).strip().lower() not in ('false', '0', 'no')
+  return os.environ.get('TELEMETRY_OPT_IN', 'true').strip().lower() not in (
+      'false',
+      '0',
+      'no',
+  )
+
+
 def _log_telemetry(data: Dict[str, str], action: str) -> None:
   """Fails open to emit a SOLUTION_USAGE event via Tadau."""
   try:
     if Tadau is None:
+      return
+    opt_in = _is_telemetry_opt_in(data)
+    if not opt_in:
       return
     property_id = _extract_numeric_id(
         data.get('property_id') or data.get('name', '')
@@ -166,7 +183,7 @@ def _log_telemetry(data: Dict[str, str], action: str) -> None:
     tadau_client = Tadau(
         api_secret=_TELEMETRY_API_SECRET,
         measurement_id=_TELEMETRY_MEASUREMENT_ID,
-        opt_in=True,
+        opt_in=opt_in,
         fixed_dimensions={
             'app': _TELEMETRY_APP_NAME,
             'is_agent_event': False,
