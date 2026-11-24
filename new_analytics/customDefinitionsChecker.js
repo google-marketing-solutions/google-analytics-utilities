@@ -101,7 +101,10 @@ const CHECKER_NOTES = {
     CHECKER_ITEM_METRICS.map(itemMetric => itemMetric.eventName).join(', ') +
     '.',
   TIME_LIMIT: 'Not checked to stay within the Apps Script time limit. ' +
-    'Select fewer properties and run the report again.'
+    'Select fewer properties and run the report again.',
+  METRIC_EVENT_COUNT: 'The event count includes all events with the listed ' +
+    'event names, not only the events that sent this metric, so it can be ' +
+    'higher than the number of events that recorded a value.'
 };
 
 /**
@@ -207,6 +210,14 @@ function runCustomDefinitionsChecker_(checker, options = {}) {
 }
 
 /**
+ * Matches the values the Data API returns when a custom dimension is not set.
+ * Besides "(not set)", events that don't send the parameter can be returned
+ * with an empty string, for example events collected after the custom
+ * dimension was registered.
+ */
+const CHECKER_NOT_SET_REGEXP = '(\\(not set\\))?';
+
+/**
  * Builds the Data API request that checks a custom dimension. Only events
  * (or items) where the custom dimension is set are counted.
  * @param {!Object} customDimension A custom dimension from the Admin API.
@@ -219,7 +230,7 @@ function buildCustomDimensionCheckRequest_(customDimension) {
     notExpression: {
       filter: {
         fieldName: prefix + customDimension.parameterName,
-        stringFilter: {matchType: 'EXACT', value: '(not set)'}
+        stringFilter: {matchType: 'FULL_REGEXP', value: CHECKER_NOT_SET_REGEXP}
       }
     }
   };
@@ -467,7 +478,9 @@ function summarizeCustomMetricReport_(customMetric, report) {
     // Removes floating point noise, e.g. 0.30000000000000004 becomes 0.3.
     totalValue: Number(totalValue.toPrecision(15)),
     status: getCheckerStatus_(topEvents.length),
-    topEvents: formatCheckerTopEvents_(topEvents)
+    topEvents: formatCheckerTopEvents_(topEvents),
+    // The Data API can only filter the metric per event name, not per event.
+    note: topEvents.length > 0 ? CHECKER_NOTES.METRIC_EVENT_COUNT : ''
   };
 }
 
