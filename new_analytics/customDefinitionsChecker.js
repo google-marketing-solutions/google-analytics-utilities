@@ -38,6 +38,22 @@ const CHECKER_TOP_EVENTS_LIMIT = 10;
  */
 const CHECKER_TIME_BUDGET_MS = 5 * 60 * 1000;
 
+/**
+ * The HTTP status codes of temporary Data API errors. Requests that fail with
+ * one of them are retried, because the same request usually succeeds a few
+ * seconds later.
+ */
+const CHECKER_RETRY_STATUS_CODES = [429, 500, 502, 503, 504];
+
+/**
+ * The milliseconds to wait before each retry of a temporary error. The number
+ * of entries is the maximum number of retries.
+ */
+const CHECKER_RETRY_DELAYS_MS = [2000, 4000, 8000];
+
+/** The maximum length of an error message written to the "Notes" column. */
+const CHECKER_MAX_NOTE_LENGTH = 500;
+
 /** The Data API name prefix of a custom definition for each scope. */
 const CHECKER_API_NAME_PREFIX = {
   EVENT: 'customEvent:',
@@ -244,10 +260,14 @@ function buildCustomMetricCheckRequest_(customMetric) {
 }
 
 /**
- * Runs the Data API requests of a property in batches. If a batch fails, its
- * requests are run one at a time, so that a single failing request (for
- * example for a definition that was created too recently to be queried)
- * doesn't hide the results of the other definitions.
+ * Runs the Data API requests of a property in batches. Temporary errors (for
+ * example 502 Server Error) are retried with an increasing wait. If a batch
+ * fails with a permanent error, its requests are run one at a time, so that a
+ * single failing request (for example for a definition that was created too
+ * recently to be queried) doesn't hide the results of the other definitions.
+ * If a batch still fails with a temporary error after the retries, its
+ * requests are not run one at a time, because that would only repeat the
+ * slow failures and use up the Apps Script time limit.
  * @param {string} propertyName The property resource name.
  * @param {!Array<!Object>} requests The RunReportRequests to run.
  * @param {number} deadline The time after which no requests are started.
@@ -266,39 +286,121 @@ function runCheckerReports_(propertyName, requests, deadline) {
       continue;
     }
     let reports = null;
+    let batchError = null;
     try {
-      reports = AnalyticsData.Properties.batchRunReports(
-        {requests: batch}, propertyName).reports || [];
+      reports = callCheckerApiWithRetry_(
+        () => AnalyticsData.Properties.batchRunReports(
+          {requests: batch}, propertyName).reports || [],
+        deadline);
     } catch (e) {
       console.log(e);
+      batchError = e;
     }
     if (reports) {
       batch.forEach((request, i) => results.push(reports[i] ?
         {report: reports[i]} :
         {status: CHECKER_STATUS.ERROR, note: 'No report was returned.'}));
       Utilities.sleep(ga4RequestDelay);
+    } else if (isCheckerTemporaryError_(batchError)) {
+      const note = getCheckerErrorMessage_(batchError);
+      batch.forEach(() => results.push(
+        {status: CHECKER_STATUS.ERROR, note: note}));
     } else {
       batch.forEach(request => results.push(
-        runSingleCheckerReport_(propertyName, request)));
+        runSingleCheckerReport_(propertyName, request, deadline)));
     }
   }
   return results;
 }
 
 /**
- * Runs a single Data API request.
+ * Runs a single Data API request. Temporary errors are retried.
  * @param {string} propertyName The property resource name.
  * @param {!Object} request The RunReportRequest to run.
+ * @param {number} deadline The time after which no requests are started.
  * @return {!Object} Either {report} or the {status, note} of the error.
  */
-function runSingleCheckerReport_(propertyName, request) {
+function runSingleCheckerReport_(propertyName, request, deadline) {
+  if (Date.now() > deadline) {
+    return {status: CHECKER_STATUS.NOT_CHECKED, note: CHECKER_NOTES.TIME_LIMIT};
+  }
   try {
-    return {report: AnalyticsData.Properties.runReport(request, propertyName)};
+    return {
+      report: callCheckerApiWithRetry_(
+        () => AnalyticsData.Properties.runReport(request, propertyName),
+        deadline)
+    };
   } catch (e) {
+    console.log(e);
     return {status: CHECKER_STATUS.ERROR, note: getCheckerErrorMessage_(e)};
   } finally {
     Utilities.sleep(ga4RequestDelay);
   }
+}
+
+/**
+ * Calls the Data API and retries temporary errors with an increasing wait. A
+ * retry is only started if it can start before the deadline.
+ * @param {function(): T} apiCall The function that calls the API.
+ * @param {number} deadline The time after which no requests are started.
+ * @return {T} The return value of apiCall.
+ * @throws {*} The error of the last attempt, if every attempt failed or the
+ *     error is not temporary.
+ * @template T
+ */
+function callCheckerApiWithRetry_(apiCall, deadline) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return apiCall();
+    } catch (e) {
+      const delay = CHECKER_RETRY_DELAYS_MS[attempt];
+      if (!isCheckerTemporaryError_(e) || delay === undefined ||
+          Date.now() + delay > deadline) {
+        throw e;
+      }
+      console.log(`Temporary Data API error ` +
+        `(${getCheckerErrorStatusCode_(e) || 'no status code'}). ` +
+        `Retry ${attempt + 1} of ${CHECKER_RETRY_DELAYS_MS.length} in ` +
+        `${delay} ms.`);
+      Utilities.sleep(delay);
+    }
+  }
+}
+
+/**
+ * Returns the HTTP status code of an API error. Errors with a JSON body have
+ * the code in error.details.code. Errors with an HTML body (for example the
+ * "Error 502 (Server Error)" page) only have it in the message.
+ * @param {*} error The error thrown by an API call.
+ * @return {number|null} The status code, or null if it is unknown.
+ */
+function getCheckerErrorStatusCode_(error) {
+  if (!error) {
+    return null;
+  }
+  if (error.details && Number(error.details.code)) {
+    return Number(error.details.code);
+  }
+  const match = String(error.message || error).match(/Response Code: (\d{3})/);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * Returns whether an API error is temporary, so that the same request is
+ * likely to succeed when it is sent again.
+ * @param {*} error The error thrown by an API call.
+ * @return {boolean}
+ */
+function isCheckerTemporaryError_(error) {
+  if (!error) {
+    return false;
+  }
+  const code = getCheckerErrorStatusCode_(error);
+  if (code) {
+    return CHECKER_RETRY_STATUS_CODES.includes(code);
+  }
+  // Apps Script's own message for a failed call without a status code.
+  return /a server error occurred/i.test(String(error.message || error));
 }
 
 /**
@@ -460,10 +562,29 @@ function getCheckerCellValue_(value) {
 
 /**
  * Returns a readable error message without the Apps Script API call prefix.
+ * Temporary errors with an HTML body (for example the "Error 502 (Server
+ * Error)" page) are replaced by a short explanation, and long messages are
+ * shortened. The full error is logged where it is caught.
  * @param {!Object} error The error thrown by an API call.
  * @return {string} The error message.
  */
 function getCheckerErrorMessage_(error) {
-  const message = error && error.message ? error.message : String(error);
-  return message.replace(/^.*?API call to \S+ failed with error:\s*/, '');
+  const message = (error && error.message ? error.message : String(error))
+    .replace(/^.*?API call to \S+ failed with error:\s*/, '');
+  const code = getCheckerErrorStatusCode_(error);
+  const codeText = code ? ` (${code})` : '';
+  if (isCheckerTemporaryError_(error)) {
+    if (code === 429) {
+      return 'Google Analytics Data API quota exceeded (429). Wait a while ' +
+        'and run the checker again.';
+    }
+    return `Temporary Google Analytics server error${codeText}. Run the ` +
+      'checker again later.';
+  }
+  if (/<html|<!doctype/i.test(message)) {
+    return `Google Analytics Data API error${codeText}. See the Apps Script ` +
+      'execution log for details.';
+  }
+  return message.length > CHECKER_MAX_NOTE_LENGTH ?
+    message.slice(0, CHECKER_MAX_NOTE_LENGTH) + '...' : message;
 }
