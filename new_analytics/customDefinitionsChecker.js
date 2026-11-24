@@ -85,7 +85,10 @@ const CHECKER_NOTES = {
     CHECKER_ITEM_METRICS.map(itemMetric => itemMetric.eventName).join(', ') +
     '.',
   TIME_LIMIT: 'Not checked to stay within the Apps Script time limit. ' +
-    'Select fewer properties and run the report again.'
+    'Select fewer properties and run the report again.',
+  METRIC_EVENT_COUNT: 'The event count includes all events with the listed ' +
+    'event names, not only the events that sent this metric, so it can be ' +
+    'higher than the number of events that recorded a value.'
 };
 
 /**
@@ -373,7 +376,9 @@ function summarizeCustomMetricReport_(customMetric, report) {
     // Removes floating point noise, e.g. 0.30000000000000004 becomes 0.3.
     totalValue: Number(totalValue.toPrecision(15)),
     status: getCheckerStatus_(topEvents.length),
-    topEvents: formatCheckerTopEvents_(topEvents)
+    topEvents: formatCheckerTopEvents_(topEvents),
+    // The Data API can only filter the metric per event name, not per event.
+    note: topEvents.length > 0 ? CHECKER_NOTES.METRIC_EVENT_COUNT : ''
   };
 }
 
