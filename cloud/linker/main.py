@@ -15,7 +15,9 @@
 import functions_framework
 import os
 import io
+import re
 import time
+import uuid
 import pandas
 import google.oauth2.credentials
 from google.analytics.admin import AnalyticsAdminServiceClient
@@ -23,6 +25,15 @@ from google.analytics.admin_v1alpha.types import GoogleAdsLink
 from google.analytics.admin_v1alpha.types import DisplayVideo360AdvertiserLink
 from google.analytics.admin_v1alpha.types import DisplayVideo360AdvertiserLinkProposal
 from google.cloud import storage
+
+try:
+    from tadau import Tadau
+except ImportError:
+    Tadau = None
+
+_TELEMETRY_MEASUREMENT_ID = 'G-Z2TKLQZ79K'
+_TELEMETRY_API_SECRET = 'S7toNnNZQPWzViq44q_8gg'
+_TELEMETRY_APP_NAME = 'GA4 Toolkit'
 
 storage_client = storage.Client()
 
@@ -135,6 +146,85 @@ def main(cloud_event):
     csv_str = pandas.DataFrame(responses).to_csv()
     output_bucket_blob = storage_client.get_bucket(OUTPUT_BUCKET).blob(f'results-{time.time()}.csv')
     output_bucket_blob.upload_from_string(csv_str, content_type='text/csv')
+    _log_batch_telemetry(responses)
+
+
+def _normalize_numeric_ids(raw_values):
+    seen = set()
+    cleaned = []
+    for val in raw_values:
+        if val is None:
+            continue
+        bare = re.sub(r'\D+', '', str(val))
+        if bare and bare not in seen:
+            seen.add(bare)
+            cleaned.append(bare)
+    return ','.join(cleaned)
+
+
+def _format_external_ads_customer_ids(raw_values):
+    seen = set()
+    cleaned = []
+    for val in raw_values:
+        if val is None:
+            continue
+        digits = re.sub(r'\D+', '', str(val))
+        if not digits:
+            continue
+        formatted = (
+            f'{digits[:3]}-{digits[3:6]}-{digits[6:]}'
+            if len(digits) == 10
+            else digits
+        )
+        if formatted not in seen:
+            seen.add(formatted)
+            cleaned.append(formatted)
+    return ','.join(cleaned)
+
+
+def _log_batch_telemetry(responses):
+    """Fails open to emit a SOLUTION_USAGE event via Tadau for created links."""
+    try:
+        if Tadau is None or not responses:
+            return
+        opt_in = os.environ.get('TELEMETRY_OPT_IN', 'true').strip().lower() not in (
+            'false',
+            '0',
+            'no',
+        )
+        if not opt_in:
+            return
+        created = [r for r in responses if r.get('result') == 'created']
+        if not created:
+            return
+        prop_ids = _normalize_numeric_ids([r.get('ga_propety_id') for r in created])
+        ads_cids = _format_external_ads_customer_ids([
+            r.get('platform_id') for r in created if r.get('type') == 'ads'
+        ])
+        if not prop_ids and not ads_cids:
+            return
+        event = {
+            'name': 'SOLUTION_USAGE',
+            'external_event_id': str(uuid.uuid4()),
+            'label': 'cloud_linker_batch',
+        }
+        if prop_ids:
+            event['th_analytics_property_id'] = prop_ids
+        if ads_cids:
+            event['th_google_ads_customer_id'] = ads_cids
+        tadau_client = Tadau(
+            api_secret=_TELEMETRY_API_SECRET,
+            measurement_id=_TELEMETRY_MEASUREMENT_ID,
+            opt_in=opt_in,
+            fixed_dimensions={
+                'app': _TELEMETRY_APP_NAME,
+                'is_agent_event': False,
+                'non_personalized_ads': False,
+            },
+        )
+        tadau_client.send_events([event])
+    except Exception:
+        pass
 
 
 

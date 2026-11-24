@@ -174,4 +174,11 @@ function writeUserAccessReportDataToSheet() {
   sheet.clearContents();
   sheet.getRange(1, 1, data.length, data[0].length)
     .setValues(neutralizeFormulas(data));
+  if (typeof Telemetry !== 'undefined') {
+    Telemetry.logSheetsReportGenerated({
+      accountIds: entities.map(e => e.accountId),
+      propertyIds: entities.map(e => e.propertyId),
+      label: sheetsMeta.ga4.userAccessReport.sheetName,
+    });
+  }
 }

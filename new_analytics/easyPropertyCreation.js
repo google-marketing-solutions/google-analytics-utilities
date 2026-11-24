@@ -251,6 +251,10 @@ function createPropertiesFromTemplates() {
   const data = 
     getDataFromSheet(sheetsMeta.ga4.fullPropertyDeployment.sheetName);
   if (data.length > 0) {
+    const createdAccountIds = [];
+    const createdPropertyIds = [];
+    let hasCreatedProperty = false;
+
     data.forEach((row, index) => {
       const create = row[row.length - 4];
       if (create) {
@@ -383,11 +387,30 @@ function createPropertiesFromTemplates() {
               newProperty.name.split('/')[1] + '", "New Property")');
         }
         // Write the actions taken.
+        const actionTaken = responseCheck(responses, 'create');
         writeActionTakenToSheet(
           sheetsMeta.ga4.fullPropertyDeployment.sheetName, index, 
-          responseCheck(responses, 'create'));
+          actionTaken);
+        if (actionTaken && !String(actionTaken).startsWith('Error')) {
+          hasCreatedProperty = true;
+          if (targetAccountId) {
+            createdAccountIds.push(targetAccountId);
+          }
+          if (newProperty && newProperty.name) {
+            createdPropertyIds.push(newProperty.name);
+          } else if (row[3]) {
+            createdPropertyIds.push(row[3]);
+          }
+        }
       }
     });
+    if (hasCreatedProperty && typeof Telemetry !== 'undefined') {
+      Telemetry.logSolutionUsage({
+        accountIds: createdAccountIds,
+        propertyIds: createdPropertyIds,
+        label: sheetsMeta.ga4.fullPropertyDeployment.sheetName,
+      });
+    }
   }
 }
 

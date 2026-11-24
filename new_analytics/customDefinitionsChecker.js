@@ -207,6 +207,13 @@ function runCustomDefinitionsChecker_(checker, options = {}) {
 
   clearSheetContent(checker.sheetMeta);
   writeToSheet(rows, checker.sheetMeta.sheetName);
+  if (typeof Telemetry !== 'undefined' && !options.silent) {
+    Telemetry.logSheetsReportGenerated({
+      accountIds: properties.map(row => row[1]),
+      propertyIds: properties.map(row => row[3]),
+      label: checker.sheetMeta.sheetName,
+    });
+  }
 }
 
 /**
