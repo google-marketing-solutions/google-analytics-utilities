@@ -191,6 +191,14 @@ function runCustomDefinitionsChecker_(checker, options = {}) {
 }
 
 /**
+ * Matches the values the Data API returns when a custom dimension is not set.
+ * Besides "(not set)", events that don't send the parameter can be returned
+ * with an empty string, for example events collected after the custom
+ * dimension was registered.
+ */
+const CHECKER_NOT_SET_REGEXP = '(\\(not set\\))?';
+
+/**
  * Builds the Data API request that checks a custom dimension. Only events
  * (or items) where the custom dimension is set are counted.
  * @param {!Object} customDimension A custom dimension from the Admin API.
@@ -203,7 +211,7 @@ function buildCustomDimensionCheckRequest_(customDimension) {
     notExpression: {
       filter: {
         fieldName: prefix + customDimension.parameterName,
-        stringFilter: {matchType: 'EXACT', value: '(not set)'}
+        stringFilter: {matchType: 'FULL_REGEXP', value: CHECKER_NOT_SET_REGEXP}
       }
     }
   };
